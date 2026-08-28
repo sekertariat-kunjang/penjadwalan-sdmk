@@ -471,7 +471,11 @@ function setViewMode(mode) {
 }
 
 function setKlasterFilter(klaster) {
-    state.activeKlasterFilter = klaster;
+    if (state.activeKlasterFilter === klaster) {
+        state.activeKlasterFilter = 'ALL';
+    } else {
+        state.activeKlasterFilter = klaster;
+    }
     renderKlasterFilterChips();
     renderMatrixKlaster();
 }
@@ -845,7 +849,7 @@ function renderMatrixKlaster() {
     // BOTTOM SUMMARY ROW FOR LIBUR & CUTI (SHIFT L & C)
     // -------------------------------------------------------------
     const summaryTr = document.createElement('tr');
-    summaryTr.className = 'bg-slate-950 border-t-2 border-slate-700 font-bold sticky bottom-0 z-30 shadow-lg';
+    summaryTr.className = 'bg-slate-950 border-t-2 border-slate-700/80 font-bold hover:bg-slate-900/60 transition';
 
     let summaryRowHTML = `
         <td class="p-2 sticky-col-1 bg-slate-950 border-r border-slate-800 font-bold text-amber-400">
