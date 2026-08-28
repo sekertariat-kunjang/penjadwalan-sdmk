@@ -59,14 +59,21 @@
 
         /* Sticky Freeze Header & Column for Matrix */
         .sticky-col-1 {
-            position: sticky;
-            left: 0;
-            z-index: 20;
+            position: sticky !important;
+            left: 0 !important;
+            z-index: 25 !important;
+            background-color: #0f172a !important;
+            box-shadow: 4px 0 10px -2px rgba(0, 0, 0, 0.7);
+        }
+        th.sticky-col-1 {
+            z-index: 35 !important;
+            background-color: #020617 !important;
         }
         .sticky-header {
-            position: sticky;
-            top: 0;
-            z-index: 30;
+            position: sticky !important;
+            top: 0 !important;
+            z-index: 30 !important;
+            background-color: #020617 !important;
         }
 
         /* Crosshair Hover Highlight Effect */

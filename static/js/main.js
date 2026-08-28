@@ -806,7 +806,6 @@ function renderMatrixKlaster() {
             cellTd.setAttribute('data-tanggal', tglStr);
             cellTd.setAttribute('data-ruangan-id', r.id);
             cellTd.setAttribute('data-day', day);
-            cellTd.setAttribute('title', staffTitle);
             if (canEdit) cellTd.setAttribute('onclick', `openCellModal('${tglStr}', ${r.id})`);
             cellTd.innerHTML = cellContent;
 
