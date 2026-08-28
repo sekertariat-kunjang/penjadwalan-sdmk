@@ -65,13 +65,45 @@
         }
         .sticky-col-2 {
             position: sticky;
-            left: 180px;
+            left: 40px;
             z-index: 20;
         }
         .sticky-header {
             position: sticky;
             top: 0;
             z-index: 30;
+        }
+
+        /* Crosshair Hover Highlight Effect */
+        tr.crosshair-row-active > td {
+            background-color: rgba(20, 184, 166, 0.08) !important;
+        }
+        td.crosshair-col-active {
+            background-color: rgba(20, 184, 166, 0.08) !important;
+        }
+        th.crosshair-col-active {
+            background-color: rgba(20, 184, 166, 0.25) !important;
+            color: #2dd4bf !important;
+        }
+        td.crosshair-cell-active {
+            background-color: rgba(20, 184, 166, 0.25) !important;
+            outline: 2px solid #14b8a6;
+            outline-offset: -2px;
+            border-radius: 4px;
+        }
+
+        /* Sidebar Collapsible Drawer */
+        #sidebar-palette-container {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sidebar-palette-container.collapsed {
+            width: 0px !important;
+            min-width: 0px !important;
+            padding: 0px !important;
+            margin: 0px !important;
+            border: none !important;
+            overflow: hidden !important;
+            opacity: 0;
         }
     </style>
 </head>
@@ -178,7 +210,7 @@
     </div>
 
     <!-- Main Workspace Area -->
-    <div class="flex-1 flex flex-col md:flex-row gap-4 p-4 max-w-7xl mx-auto w-full overflow-hidden">
+    <div class="flex-1 flex flex-col md:flex-row gap-4 p-4 max-w-[1600px] mx-auto w-full overflow-hidden">
         
         <!-- Left Sidebar Palette (Drag & Drop + Search) -->
         <aside id="sidebar-palette-container" class="w-full md:w-64 bg-slate-900/80 border border-slate-800 rounded-xl p-3 flex flex-col gap-3 shrink-0 h-fit md:h-[calc(100vh-100px)] transition-all">
@@ -188,7 +220,10 @@
                     <i data-lucide="grip-vertical" class="w-4 h-4 text-teal-400"></i>
                     Palet Drag & Drop
                 </span>
-                <span class="text-[10px] text-slate-400">Tarik ke tabel</span>
+                <button onclick="toggleSidebar()" class="text-slate-400 hover:text-slate-200 text-xs flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700">
+                    <i data-lucide="panel-left-close" class="w-3.5 h-3.5"></i>
+                    <span class="text-[10px]">Sembunyikan</span>
+                </button>
             </div>
 
             <!-- Master Shift Palette -->
@@ -255,6 +290,48 @@
                     Detail Pegawai
                 </button>
             </nav>
+
+            <!-- Upperbar Matrix Control Toolbar -->
+            <div id="upperbar-matrix-toolbar" class="bg-slate-950/90 border-b border-slate-800 px-3 py-2 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <!-- Left Group: Toggle Sidebar & View Density Mode -->
+                <div class="flex items-center gap-2">
+                    <!-- Sidebar Toggle Button -->
+                    <button id="btn-toggle-sidebar" onclick="toggleSidebar()" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-400 font-semibold border border-slate-700 transition" title="Buka/Tutup Panel Pegawai">
+                        <i data-lucide="panel-left" id="icon-toggle-sidebar" class="w-3.5 h-3.5"></i>
+                        <span class="text-slate-200 font-medium">Panel Pegawai</span>
+                    </button>
+
+                    <div class="h-4 w-px bg-slate-800 mx-0.5"></div>
+
+                    <!-- Density Mode Switcher -->
+                    <div class="flex items-center bg-slate-900 border border-slate-800 rounded-lg p-0.5 shadow-inner">
+                        <button id="btn-mode-compact" onclick="setViewMode('compact')" class="px-2.5 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 bg-teal-600 text-white transition shadow">
+                            <i data-lucide="grid" class="w-3.5 h-3.5"></i>
+                            Ringkas
+                        </button>
+                        <button id="btn-mode-detail" onclick="setViewMode('detail')" class="px-2.5 py-1 rounded-md font-medium text-[11px] flex items-center gap-1 text-slate-400 hover:text-slate-200 transition">
+                            <i data-lucide="align-justify" class="w-3.5 h-3.5"></i>
+                            Detail
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Middle Group: Horizontal Quick Shift Palette -->
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider hidden lg:inline">Palet Shift:</span>
+                    <div id="upperbar-shift-palette" class="flex items-center gap-1 overflow-x-auto">
+                        <!-- Dynamic Shifts populated via JS -->
+                    </div>
+                </div>
+
+                <!-- Right Group: Klaster Filter Chips -->
+                <div class="flex items-center gap-1.5 overflow-x-auto">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider hidden xl:inline">Filter Klaster:</span>
+                    <div id="klaster-filter-chips" class="flex items-center gap-1">
+                        <!-- Dynamic Chips via JS -->
+                    </div>
+                </div>
+            </div>
 
             <!-- TAB CONTENT CONTAINER -->
             <div class="flex-1 overflow-auto relative p-3">
@@ -598,6 +675,25 @@
                 <button onclick="closeConflictModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
                     Tutup
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rich Tooltip Popover for Compact Mode -->
+    <div id="rich-tooltip" class="fixed hidden z-50 bg-slate-900 border border-teal-500/40 rounded-xl p-3 shadow-2xl backdrop-blur-md pointer-events-none transition-opacity duration-150 max-w-xs text-xs">
+        <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5 mb-2">
+            <span id="tooltip-shift-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">Pagi</span>
+            <span id="tooltip-date" class="text-slate-400 text-[11px] font-medium">Tgl 15 Aug 2026</span>
+        </div>
+        <div class="space-y-1">
+            <div class="font-bold text-slate-100 text-sm" id="tooltip-staff-name">dr. Ahmad Fauzi, Sp.KKLP</div>
+            <div class="text-[11px] text-teal-400 font-medium" id="tooltip-profesi">Dokter Umum</div>
+            <div class="text-[11px] text-slate-300 flex items-center gap-1 mt-1">
+                <i data-lucide="map-pin" class="w-3 h-3 text-teal-400"></i>
+                <span id="tooltip-room" class="font-semibold text-slate-200">Poli Umum</span>
+            </div>
+            <div class="text-[10px] text-slate-400 italic mt-1 hidden" id="tooltip-note-container">
+                Catatan: <span id="tooltip-note"></span>
             </div>
         </div>
     </div>

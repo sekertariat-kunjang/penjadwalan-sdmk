@@ -13,7 +13,11 @@ const state = {
     conflicts: [],
     selectedCell: null, // { tanggal, ruangan_id }
     selectedHarianDate: null,
-    dragData: null // { type: 'shift'|'pegawai', id: number }
+    dragData: null, // { type: 'shift'|'pegawai', id: number }
+    viewMode: 'compact', // 'compact' | 'detail'
+    isSidebarOpen: true,
+    activeKlasterFilter: 'ALL',
+    collapsedKlaster: {}
 };
 
 const INDONESIAN_DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
@@ -72,6 +76,7 @@ async function loadDashboardData() {
             // Populate Sidebar Palettes & Modals
             renderShiftPalette();
             renderPegawaiPalette();
+            renderKlasterFilterChips();
             populateModalDropdowns();
 
             // Enforce Role & Locking UI Restrictions
@@ -427,25 +432,176 @@ function closeConflictModal() {
     document.getElementById('modal-conflict').classList.add('hidden');
 }
 
-// Render Master Shift Badges Palette in Sidebar
+// -------------------------------------------------------------
+// UI WORKSPACE CONTROLS (UPPERBAR, SIDEBAR & TOOLTIPS)
+// -------------------------------------------------------------
+function toggleSidebar() {
+    state.isSidebarOpen = !state.isSidebarOpen;
+    const sidebar = document.getElementById('sidebar-palette-container');
+    const icon = document.getElementById('icon-toggle-sidebar');
+
+    if (sidebar) {
+        if (state.isSidebarOpen) {
+            sidebar.classList.remove('collapsed');
+            if (icon) icon.setAttribute('data-lucide', 'panel-left');
+        } else {
+            sidebar.classList.add('collapsed');
+            if (icon) icon.setAttribute('data-lucide', 'panel-left-open');
+        }
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function setViewMode(mode) {
+    state.viewMode = mode;
+    const btnCompact = document.getElementById('btn-mode-compact');
+    const btnDetail = document.getElementById('btn-mode-detail');
+
+    if (btnCompact && btnDetail) {
+        if (mode === 'compact') {
+            btnCompact.className = 'px-2.5 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 bg-teal-600 text-white transition shadow';
+            btnDetail.className = 'px-2.5 py-1 rounded-md font-medium text-[11px] flex items-center gap-1 text-slate-400 hover:text-slate-200 transition';
+        } else {
+            btnDetail.className = 'px-2.5 py-1 rounded-md font-bold text-[11px] flex items-center gap-1 bg-teal-600 text-white transition shadow';
+            btnCompact.className = 'px-2.5 py-1 rounded-md font-medium text-[11px] flex items-center gap-1 text-slate-400 hover:text-slate-200 transition';
+        }
+    }
+
+    renderMatrixKlaster();
+}
+
+function setKlasterFilter(klaster) {
+    state.activeKlasterFilter = klaster;
+    renderKlasterFilterChips();
+    renderMatrixKlaster();
+}
+
+function toggleKlasterAccordion(klasterName) {
+    state.collapsedKlaster[klasterName] = !state.collapsedKlaster[klasterName];
+    renderMatrixKlaster();
+}
+
+function renderKlasterFilterChips() {
+    const container = document.getElementById('klaster-filter-chips');
+    if (!container) return;
+
+    const klasters = Array.from(new Set(state.ruangan_list.map(r => r.klaster)));
+
+    let chipsHTML = `
+        <button onclick="setKlasterFilter('ALL')" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition ${state.activeKlasterFilter === 'ALL' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm' : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200'}">
+            Semua (${state.ruangan_list.length})
+        </button>
+    `;
+
+    klasters.forEach(k => {
+        const count = state.ruangan_list.filter(r => r.klaster === k).length;
+        const isActive = state.activeKlasterFilter === k;
+        let shortName = k.replace('Klaster ', 'K-');
+        chipsHTML += `
+            <button onclick="setKlasterFilter('${k}')" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition whitespace-nowrap ${isActive ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40 shadow-sm' : 'bg-slate-900 text-slate-400 border border-slate-800 hover:text-slate-200'}">
+                ${shortName} (${count})
+            </button>
+        `;
+    });
+
+    container.innerHTML = chipsHTML;
+}
+
+function showRichTooltip(e, j, tglStr, roomName) {
+    const tooltip = document.getElementById('rich-tooltip');
+    if (!tooltip) return;
+
+    const badge = document.getElementById('tooltip-shift-badge');
+    const dateEl = document.getElementById('tooltip-date');
+    const nameEl = document.getElementById('tooltip-staff-name');
+    const profesiEl = document.getElementById('tooltip-profesi');
+    const roomEl = document.getElementById('tooltip-room');
+    const noteEl = document.getElementById('tooltip-note');
+    const noteContainer = document.getElementById('tooltip-note-container');
+
+    if (badge) {
+        badge.textContent = `${j.shift_kode} (${j.shift_nama})`;
+        badge.style.backgroundColor = j.warna_bg;
+        badge.style.color = j.warna_text;
+    }
+    if (dateEl) dateEl.textContent = `Tgl ${tglStr}`;
+    if (nameEl) nameEl.textContent = j.pegawai_nama || 'Pegawai';
+    if (profesiEl) profesiEl.textContent = j.profesi || 'SDMK';
+    if (roomEl) roomEl.textContent = roomName || j.ruangan_nama || '';
+
+    if (j.catatan) {
+        if (noteEl) noteEl.textContent = j.catatan;
+        if (noteContainer) noteContainer.classList.remove('hidden');
+    } else {
+        if (noteContainer) noteContainer.classList.add('hidden');
+    }
+
+    tooltip.classList.remove('hidden');
+    moveRichTooltip(e);
+}
+
+function moveRichTooltip(e) {
+    const tooltip = document.getElementById('rich-tooltip');
+    if (!tooltip || tooltip.classList.contains('hidden')) return;
+
+    const padding = 12;
+    let left = e.clientX + padding;
+    let top = e.clientY + padding;
+
+    if (left + 240 > window.innerWidth) {
+        left = e.clientX - 240 - padding;
+    }
+    if (top + 160 > window.innerHeight) {
+        top = e.clientY - 160 - padding;
+    }
+
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+}
+
+function hideRichTooltip() {
+    const tooltip = document.getElementById('rich-tooltip');
+    if (tooltip) tooltip.classList.add('hidden');
+}
+
+// Render Master Shift Badges Palette in Sidebar & Upperbar
 function renderShiftPalette() {
-    const container = document.getElementById('shift-palette');
-    container.innerHTML = '';
+    const sidebarContainer = document.getElementById('shift-palette');
+    const upperbarContainer = document.getElementById('upperbar-shift-palette');
+
+    if (sidebarContainer) sidebarContainer.innerHTML = '';
+    if (upperbarContainer) upperbarContainer.innerHTML = '';
 
     state.shift_list.forEach(s => {
-        const badge = document.createElement('div');
-        badge.className = 'px-2 py-1.5 rounded-lg text-center font-bold text-xs cursor-grab active:cursor-grabbing border border-slate-700 shadow-sm transition hover:scale-105 select-none';
-        badge.style.backgroundColor = s.warna_bg;
-        badge.style.color = s.warna_text;
-        badge.innerHTML = `<span class="block text-[10px] opacity-80 font-normal">${s.nama}</span>${s.kode}`;
-        
-        badge.draggable = true;
-        badge.addEventListener('dragstart', (e) => {
-            state.dragData = { type: 'shift', id: s.id };
-            e.dataTransfer.setData('text/plain', JSON.stringify(state.dragData));
-        });
+        // Sidebar badge
+        if (sidebarContainer) {
+            const badge = document.createElement('div');
+            badge.className = 'px-2 py-1.5 rounded-lg text-center font-bold text-xs cursor-grab active:cursor-grabbing border border-slate-700 shadow-sm transition hover:scale-105 select-none';
+            badge.style.backgroundColor = s.warna_bg;
+            badge.style.color = s.warna_text;
+            badge.innerHTML = `<span class="block text-[10px] opacity-80 font-normal">${s.nama}</span>${s.kode}`;
+            badge.draggable = true;
+            badge.addEventListener('dragstart', (e) => {
+                state.dragData = { type: 'shift', id: s.id };
+                e.dataTransfer.setData('text/plain', JSON.stringify(state.dragData));
+            });
+            sidebarContainer.appendChild(badge);
+        }
 
-        container.appendChild(badge);
+        // Upperbar horizontal badge
+        if (upperbarContainer) {
+            const upBadge = document.createElement('div');
+            upBadge.className = 'px-2 py-1 rounded-md text-center font-bold text-[11px] cursor-grab active:cursor-grabbing border border-white/10 shadow-sm transition hover:scale-105 select-none whitespace-nowrap flex items-center gap-1';
+            upBadge.style.backgroundColor = s.warna_bg;
+            upBadge.style.color = s.warna_text;
+            upBadge.innerHTML = `<span class="opacity-80 text-[10px] font-normal">[${s.kode}]</span> <span>${s.nama}</span>`;
+            upBadge.draggable = true;
+            upBadge.addEventListener('dragstart', (e) => {
+                state.dragData = { type: 'shift', id: s.id };
+                e.dataTransfer.setData('text/plain', JSON.stringify(state.dragData));
+            });
+            upperbarContainer.appendChild(upBadge);
+        }
     });
 }
 
@@ -528,6 +684,8 @@ function renderMatrixKlaster() {
     const headerTr = document.getElementById('matrix-header-days');
     const tbody = document.getElementById('matrix-body-klaster');
 
+    if (!headerTr || !tbody) return;
+
     let headerHTML = `
         <th class="p-2 w-10 text-center sticky-col-1 bg-slate-950 border-r border-slate-800 font-bold">No</th>
         <th class="p-2 w-44 sticky-col-2 bg-slate-950 border-r border-slate-800 font-bold">Ruangan / Layanan</th>
@@ -540,7 +698,7 @@ function renderMatrixKlaster() {
         const isSunday = dayIdx === 0;
 
         headerHTML += `
-            <th class="p-1 w-12 text-center border-r border-slate-800/60 font-semibold ${isSunday ? 'bg-rose-950/40 text-rose-400' : ''}">
+            <th class="p-1 w-12 text-center border-r border-slate-800/60 font-semibold ${isSunday ? 'bg-rose-950/40 text-rose-400' : ''}" data-day="${day}">
                 <span class="block text-[10px] text-slate-400">${dayName}</span>
                 <span class="text-xs font-bold">${day}</span>
             </th>
@@ -560,18 +718,35 @@ function renderMatrixKlaster() {
     const isLocked = state.status_jadwal.status === 'FINAL';
     const userRole = state.current_user ? state.current_user.role : 'pegawai';
 
-    state.ruangan_list.forEach(r => {
+    const filteredRuangan = state.activeKlasterFilter === 'ALL'
+        ? state.ruangan_list
+        : state.ruangan_list.filter(r => r.klaster === state.activeKlasterFilter);
+
+    filteredRuangan.forEach(r => {
         if (r.klaster !== currentKlaster) {
             currentKlaster = r.klaster;
+            const isCollapsed = !!state.collapsedKlaster[currentKlaster];
+
             const groupTr = document.createElement('tr');
-            groupTr.className = 'bg-slate-950/90 text-teal-400 font-bold border-y border-slate-800';
+            groupTr.className = 'bg-slate-950/90 text-teal-400 font-bold border-y border-slate-800 cursor-pointer hover:bg-slate-900 transition border-l-4 border-l-teal-400 select-none';
+            groupTr.onclick = () => toggleKlasterAccordion(r.klaster);
             groupTr.innerHTML = `
-                <td colspan="${state.num_days + 2}" class="p-2 text-xs uppercase tracking-wider pl-4">
-                    <i data-lucide="folder-kanban" class="w-3.5 h-3.5 inline mr-1 text-teal-400"></i>
-                    ${currentKlaster}
+                <td colspan="${state.num_days + 2}" class="p-2 text-xs uppercase tracking-wider pl-3 flex items-center justify-between">
+                    <span class="flex items-center gap-2">
+                        <i data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-down'}" class="w-4 h-4 text-teal-400"></i>
+                        <i data-lucide="folder-kanban" class="w-3.5 h-3.5 text-teal-400"></i>
+                        ${currentKlaster}
+                    </span>
+                    <span class="text-[10px] font-normal text-slate-400">
+                        ${isCollapsed ? '(Klik untuk membuka)' : '(Klik untuk melipat)'}
+                    </span>
                 </td>
             `;
             tbody.appendChild(groupTr);
+        }
+
+        if (state.collapsedKlaster[r.klaster]) {
+            return; // Skip rendering room row if cluster is collapsed
         }
 
         const tr = document.createElement('tr');
@@ -584,6 +759,7 @@ function renderMatrixKlaster() {
                 <span class="text-[10px] text-slate-500 font-normal">${r.kode}</span>
             </td>
         `;
+        tr.innerHTML = rowHTML;
 
         for (let day = 1; day <= state.num_days; day++) {
             const tglStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -596,31 +772,68 @@ function renderMatrixKlaster() {
             if (j) {
                 const shiftCode = j.shift_kode;
                 const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
-                cellContent = `
-                    <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                        <span>${shiftCode}</span>
-                        <span class="block text-[9px] font-normal truncate opacity-90">${staffName}</span>
-                    </div>
-                `;
+
+                if (state.viewMode === 'compact') {
+                    cellContent = `
+                        <div class="px-1 py-1 rounded text-[10px] font-black text-center border border-white/10 shadow-sm transition hover:scale-105" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                            <span>${shiftCode}</span>
+                        </div>
+                    `;
+                } else {
+                    cellContent = `
+                        <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                            <span>${shiftCode}</span>
+                            <span class="block text-[9px] font-normal truncate opacity-90">${staffName}</span>
+                        </div>
+                    `;
+                }
                 staffTitle = `${j.pegawai_nama} (${j.shift_nama})`;
             }
 
             const canEdit = !isLocked && (userRole === 'admin' || userRole === 'kapus');
             const pointerClass = canEdit ? 'cursor-pointer hover:bg-teal-950/40 dropzone' : 'cursor-default';
-            const clickAttr = canEdit ? `onclick="openCellModal('${tglStr}', ${r.id})"` : '';
 
-            rowHTML += `
-                <td class="p-1 border-r border-b border-slate-800/40 text-center transition ${pointerClass}"
-                    data-tanggal="${tglStr}"
-                    data-ruangan-id="${r.id}"
-                    title="${staffTitle}"
-                    ${clickAttr}>
-                    ${cellContent}
-                </td>
-            `;
+            const cellTd = document.createElement('td');
+            cellTd.className = `p-1 border-r border-b border-slate-800/40 text-center transition ${pointerClass}`;
+            cellTd.setAttribute('data-tanggal', tglStr);
+            cellTd.setAttribute('data-ruangan-id', r.id);
+            cellTd.setAttribute('data-day', day);
+            cellTd.setAttribute('title', staffTitle);
+            if (canEdit) cellTd.setAttribute('onclick', `openCellModal('${tglStr}', ${r.id})`);
+            cellTd.innerHTML = cellContent;
+
+            // Crosshair Hover Highlight & Rich Tooltip Handlers
+            cellTd.addEventListener('mouseenter', (e) => {
+                tr.classList.add('crosshair-row-active');
+
+                const currentDay = day;
+                document.querySelectorAll(`[data-day="${currentDay}"]`).forEach(el => {
+                    el.classList.add('crosshair-col-active');
+                });
+
+                cellTd.classList.add('crosshair-cell-active');
+
+                if (j) {
+                    showRichTooltip(e, j, tglStr, r.nama);
+                }
+            });
+
+            cellTd.addEventListener('mousemove', (e) => {
+                if (j) moveRichTooltip(e);
+            });
+
+            cellTd.addEventListener('mouseleave', () => {
+                tr.classList.remove('crosshair-row-active');
+                document.querySelectorAll('.crosshair-col-active').forEach(el => {
+                    el.classList.remove('crosshair-col-active');
+                });
+                cellTd.classList.remove('crosshair-cell-active');
+                hideRichTooltip();
+            });
+
+            tr.appendChild(cellTd);
         }
 
-        tr.innerHTML = rowHTML;
         tbody.appendChild(tr);
     });
 
