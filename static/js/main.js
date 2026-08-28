@@ -776,59 +776,45 @@ function renderMatrixKlaster() {
             let staffTitle = '';
 
             if (listJ.length > 0) {
-                staffTitle = listJ.map(j => `${j.pegawai_nama} (${j.shift_nama})`).join(', ');
+                const primaryJ = listJ[0];
+                const shiftCodes = Array.from(new Set(listJ.map(j => j.shift_kode))).join('/');
+                const isMulti = listJ.length > 1;
+                const extraCount = listJ.length - 1;
 
                 if (state.viewMode === 'compact') {
-                    // Mode Ringkas: Side-by-side compact shift badges in 1 single line
-                    const visibleJ = listJ.slice(0, 2);
-                    const extraCount = listJ.length - visibleJ.length;
-
-                    const badgesHTML = visibleJ.map(j => `
-                        <div class="px-1.5 py-0.5 rounded text-[11px] font-black text-center border border-white/10 shadow-sm inline-block" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                            <span>${j.shift_kode}</span>
-                        </div>
-                    `).join('');
-
-                    const extraBadge = extraCount > 0 ? `
-                        <span class="px-1 py-0.5 rounded bg-slate-800 text-teal-300 border border-slate-700 text-[10px] font-bold shrink-0">
-                            +${extraCount}
-                        </span>
-                    ` : '';
-
-                    cellContent = `<div class="flex items-center justify-center gap-0.5 flex-nowrap">${badgesHTML}${extraBadge}</div>`;
-                } else {
-                    // Mode Detail: Compact horizontal side-by-side badges in 1 single line to keep row height uniform
-                    if (listJ.length === 1) {
-                        const j = listJ[0];
-                        const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
+                    if (isMulti) {
                         cellContent = `
-                            <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                                <span class="font-extrabold text-xs block leading-none">${j.shift_kode}</span>
-                                <span class="block text-[9px] font-semibold truncate opacity-95 mt-0.5 leading-tight">${staffName}</span>
+                            <div class="px-1.5 py-1 rounded-md text-xs font-black border-2 border-amber-400/80 shadow inline-flex items-center gap-1 transition hover:scale-105 select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                                <span>${shiftCodes}</span>
+                                <span class="px-1 text-[9px] bg-amber-400 text-slate-950 font-black rounded-full shrink-0" title="${listJ.length} Petugas Jaga">+${extraCount}</span>
                             </div>
                         `;
                     } else {
-                        // Multi-Staff (2+): Horizontal side-by-side in 1 line to prevent row height expansion
-                        const visibleJ = listJ.slice(0, 2);
-                        const extraCount = listJ.length - visibleJ.length;
-
-                        const badgesHTML = visibleJ.map(j => {
-                            const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
-                            return `
-                                <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow max-w-[42px] shrink-0" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                                    <span class="font-black text-[10px] block leading-none">${j.shift_kode}</span>
-                                    <span class="block text-[8px] font-semibold truncate opacity-90 leading-tight mt-0.5">${staffName}</span>
-                                </div>
-                            `;
-                        }).join('');
-
-                        const extraPill = extraCount > 0 ? `
-                            <div class="px-1 py-1 rounded bg-teal-500/20 text-teal-300 border border-teal-500/40 text-[9px] font-extrabold shrink-0 shadow-sm">
-                                +${extraCount}
+                        cellContent = `
+                            <div class="px-2 py-1 rounded-md text-xs font-black text-center border border-white/10 shadow transition hover:scale-105 inline-block select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                                <span>${shiftCodes}</span>
                             </div>
-                        ` : '';
-
-                        cellContent = `<div class="flex items-center justify-center gap-0.5 flex-nowrap">${badgesHTML}${extraPill}</div>`;
+                        `;
+                    }
+                } else {
+                    const staffFirstName = primaryJ.pegawai_nama ? primaryJ.pegawai_nama.split(' ')[0] : '';
+                    if (isMulti) {
+                        cellContent = `
+                            <div class="px-1.5 py-1 rounded-md text-xs font-bold border-2 border-amber-400/80 overflow-hidden shadow flex items-center justify-between gap-1 select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                                <div class="flex items-center gap-1 min-w-0">
+                                    <span class="font-black text-xs shrink-0">${shiftCodes}</span>
+                                    <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                                </div>
+                                <span class="px-1 text-[9px] bg-amber-400 text-slate-950 font-black rounded-full shrink-0" title="${listJ.length} Petugas Jaga">+${extraCount}</span>
+                            </div>
+                        `;
+                    } else {
+                        cellContent = `
+                            <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                                <span class="font-black text-xs block">${shiftCodes}</span>
+                                <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                            </div>
+                        `;
                     }
                 }
             }
@@ -904,16 +890,29 @@ function renderMatrixKlaster() {
 
         let cellContent = '-';
         if (offJadwals.length > 0) {
-            const badges = offJadwals.map(j => {
-                const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
-                return `
-                    <div class="px-1.5 py-0.5 rounded-md text-xs font-black text-center border border-white/10 my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                        <span>${j.shift_kode}</span>
-                        <span class="block text-[9px] font-semibold truncate opacity-90 leading-tight">${staffName}</span>
+            const primaryOff = offJadwals[0];
+            const isMultiOff = offJadwals.length > 1;
+            const extraOff = offJadwals.length - 1;
+            const staffFirstName = primaryOff.pegawai_nama ? primaryOff.pegawai_nama.split(' ')[0] : '';
+
+            if (isMultiOff) {
+                cellContent = `
+                    <div class="px-1.5 py-1 rounded-md text-xs font-bold border-2 border-emerald-400/70 overflow-hidden shadow flex items-center justify-between gap-1 select-none" style="background-color: ${primaryOff.warna_bg}; color: ${primaryOff.warna_text}">
+                        <div class="flex items-center gap-1 min-w-0">
+                            <span class="font-black text-xs shrink-0">${primaryOff.shift_kode}</span>
+                            <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                        </div>
+                        <span class="px-1 text-[9px] bg-emerald-400 text-slate-950 font-black rounded-full shrink-0">+${extraOff}</span>
                     </div>
                 `;
-            }).join('');
-            cellContent = `<div class="space-y-0.5">${badges}</div>`;
+            } else {
+                cellContent = `
+                    <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow select-none" style="background-color: ${primaryOff.warna_bg}; color: ${primaryOff.warna_text}">
+                        <span class="font-black text-xs block">${primaryOff.shift_kode}</span>
+                        <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                    </div>
+                `;
+            }
         }
 
         const cellTd = document.createElement('td');
