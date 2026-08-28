@@ -162,22 +162,19 @@ def init_seed_data():
                     candidate_staff = pegawai_objs
 
                 if day_of_week == 6 and 'IGD' not in r.nama and 'Rawat Inap' not in r.nama:
-                    shift_code = 'L'
-                elif 'IGD' in r.nama or 'Rawat Inap' in r.nama:
+                    continue # Closed on Sunday!
+
+                if 'IGD' in r.nama or 'Rawat Inap' in r.nama:
                     shift_code = random.choice(['P', 'S', 'M'])
                 else:
-                    shift_code = random.choice(['P', 'P', 'S', 'L'])
+                    shift_code = random.choice(['P', 'P', 'S'])
 
-                available_candidates = candidate_staff
-                if shift_code not in ['L', 'C']:
-                    available_candidates = [p for p in candidate_staff if p.id not in assigned_today]
-
+                available_candidates = [p for p in candidate_staff if p.id not in assigned_today]
                 if not available_candidates:
-                    available_candidates = candidate_staff
+                    continue
 
                 selected_pegawai = random.choice(available_candidates)
-                if shift_code not in ['L', 'C']:
-                    assigned_today.add(selected_pegawai.id)
+                assigned_today.add(selected_pegawai.id)
 
                 jadwal = Jadwal(
                     tanggal=date_str,
@@ -187,6 +184,19 @@ def init_seed_data():
                     catatan=''
                 )
                 db.session.add(jadwal)
+
+            # Assign Libur (L) & Cuti (C) status for staff who have no room duty on date_str
+            for p in pegawai_objs:
+                if p.id not in assigned_today:
+                    off_code = 'C' if random.random() < 0.1 else 'L'
+                    jadwal_off = Jadwal(
+                        tanggal=date_str,
+                        pegawai_id=p.id,
+                        ruangan_id=ruangan_objs[0].id, # placeholder room ID for DB FK
+                        shift_id=shift_objs[off_code].id,
+                        catatan='Libur Rutin' if off_code == 'L' else 'Cuti Tahunan'
+                    )
+                    db.session.add(jadwal_off)
 
             current += timedelta(days=1)
 

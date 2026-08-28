@@ -769,7 +769,8 @@ function renderMatrixKlaster() {
         for (let day = 1; day <= state.num_days; day++) {
             const tglStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const key = `${r.id}_${tglStr}`;
-            const listJ = scheduleMap[key] || [];
+            // Room cells only display active duty shifts (P, S, M, ON). L & C statuses are tracked in bottom summary row.
+            const listJ = (scheduleMap[key] || []).filter(j => !['L', 'C'].includes(j.shift_kode));
 
             let cellContent = '-';
             let staffTitle = '';
@@ -1047,14 +1048,13 @@ function renderHarianCards(dateStr) {
 
     state.ruangan_list.forEach(r => {
         const j = dayJadwalMap[r.id];
-        const card = document.createElement('div');
-        card.className = 'bg-slate-950 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between hover:border-slate-700 transition shadow-lg';
+        const isDuty = j && !['L', 'C'].includes(j.shift_kode);
 
-        let shiftBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-500">Belum diatur</span>`;
+        let shiftBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-500">Tutup / Tidak Ada Dinas</span>`;
         let staffName = 'Belum Ada Pegawai Jaga';
         let staffProfesi = '-';
 
-        if (j) {
+        if (isDuty) {
             shiftBadge = `
                 <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold border border-white/10 shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
                     Shift ${j.shift_nama} (${j.shift_kode})
