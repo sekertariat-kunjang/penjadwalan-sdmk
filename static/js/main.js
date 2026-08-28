@@ -687,8 +687,7 @@ function renderMatrixKlaster() {
     if (!headerTr || !tbody) return;
 
     let headerHTML = `
-        <th class="p-2 w-10 text-center sticky-col-1 bg-slate-950 border-r border-slate-800 font-bold">No</th>
-        <th class="p-2 w-44 sticky-col-2 bg-slate-950 border-r border-slate-800 font-bold">Ruangan / Layanan</th>
+        <th class="p-2 w-48 sticky-col-1 bg-slate-950 border-r border-slate-800 font-bold text-slate-200">Ruangan / Layanan</th>
     `;
 
     for (let day = 1; day <= state.num_days; day++) {
@@ -707,8 +706,6 @@ function renderMatrixKlaster() {
     headerTr.innerHTML = headerHTML;
 
     tbody.innerHTML = '';
-    let currentKlaster = null;
-    let rowNo = 1;
 
     const scheduleMap = {};
     state.jadwal_list.forEach(j => {
@@ -723,40 +720,13 @@ function renderMatrixKlaster() {
         : state.ruangan_list.filter(r => r.klaster === state.activeKlasterFilter);
 
     filteredRuangan.forEach(r => {
-        if (r.klaster !== currentKlaster) {
-            currentKlaster = r.klaster;
-            const isCollapsed = !!state.collapsedKlaster[currentKlaster];
-
-            const groupTr = document.createElement('tr');
-            groupTr.className = 'bg-slate-950/90 text-teal-400 font-bold border-y border-slate-800 cursor-pointer hover:bg-slate-900 transition border-l-4 border-l-teal-400 select-none';
-            groupTr.onclick = () => toggleKlasterAccordion(r.klaster);
-            groupTr.innerHTML = `
-                <td colspan="${state.num_days + 2}" class="p-2 text-xs uppercase tracking-wider pl-3 flex items-center justify-between">
-                    <span class="flex items-center gap-2">
-                        <i data-lucide="${isCollapsed ? 'chevron-right' : 'chevron-down'}" class="w-4 h-4 text-teal-400"></i>
-                        <i data-lucide="folder-kanban" class="w-3.5 h-3.5 text-teal-400"></i>
-                        ${currentKlaster}
-                    </span>
-                    <span class="text-[10px] font-normal text-slate-400">
-                        ${isCollapsed ? '(Klik untuk membuka)' : '(Klik untuk melipat)'}
-                    </span>
-                </td>
-            `;
-            tbody.appendChild(groupTr);
-        }
-
-        if (state.collapsedKlaster[r.klaster]) {
-            return; // Skip rendering room row if cluster is collapsed
-        }
-
         const tr = document.createElement('tr');
         tr.className = 'hover:bg-slate-800/30 transition';
 
         let rowHTML = `
-            <td class="p-2 text-center sticky-col-1 bg-slate-900 border-r border-slate-800 text-slate-400 font-medium">${rowNo++}</td>
-            <td class="p-2 sticky-col-2 bg-slate-900 border-r border-slate-800 font-bold text-slate-200">
-                <span class="block text-xs">${r.nama}</span>
-                <span class="text-[10px] text-slate-500 font-normal">${r.kode}</span>
+            <td class="p-2 sticky-col-1 bg-slate-900 border-r border-slate-800 font-bold text-slate-200">
+                <span class="block text-xs text-slate-100 font-semibold truncate max-w-[170px]" title="${r.nama}">${r.nama}</span>
+                <span class="text-[10px] text-teal-400 font-medium">${r.kode} <span class="text-slate-500 font-normal">| ${r.klaster}</span></span>
             </td>
         `;
         tr.innerHTML = rowHTML;
@@ -850,9 +820,10 @@ function renderMatrixProfesi() {
     const headerTr = document.getElementById('profesi-header-days');
     const tbody = document.getElementById('matrix-body-profesi');
 
+    if (!headerTr || !tbody) return;
+
     let headerHTML = `
-        <th class="p-2 w-10 text-center sticky-col-1 bg-slate-950 border-r border-slate-800 font-bold">No</th>
-        <th class="p-2 w-48 sticky-col-2 bg-slate-950 border-r border-slate-800 font-bold">Nama Pegawai & Profesi</th>
+        <th class="p-2 w-52 sticky-col-1 bg-slate-950 border-r border-slate-800 font-bold text-slate-200">Nama Pegawai & Profesi</th>
     `;
 
     for (let day = 1; day <= state.num_days; day++) {
@@ -870,7 +841,6 @@ function renderMatrixProfesi() {
 
     tbody.innerHTML = '';
     let currentProfesi = null;
-    let rowNo = 1;
 
     const sortedPegawai = [...state.pegawai_list].sort((a, b) => a.profesi.localeCompare(b.profesi));
 
@@ -887,7 +857,7 @@ function renderMatrixProfesi() {
             const groupTr = document.createElement('tr');
             groupTr.className = 'bg-slate-950/90 text-teal-400 font-bold border-y border-slate-800';
             groupTr.innerHTML = `
-                <td colspan="${state.num_days + 2}" class="p-2 text-xs uppercase tracking-wider pl-4">
+                <td colspan="${state.num_days + 1}" class="p-2 text-xs uppercase tracking-wider pl-4">
                     <i data-lucide="user-check" class="w-3.5 h-3.5 inline mr-1 text-teal-400"></i>
                     Profesi: ${currentProfesi}
                 </td>
@@ -899,9 +869,8 @@ function renderMatrixProfesi() {
         tr.className = 'hover:bg-slate-800/30 transition';
 
         let rowHTML = `
-            <td class="p-2 text-center sticky-col-1 bg-slate-900 border-r border-slate-800 text-slate-400 font-medium">${rowNo++}</td>
-            <td class="p-2 sticky-col-2 bg-slate-900 border-r border-slate-800 font-bold text-slate-200">
-                <span class="block text-xs truncate">${p.nama}</span>
+            <td class="p-2 sticky-col-1 bg-slate-900 border-r border-slate-800 font-bold text-slate-200">
+                <span class="block text-xs font-semibold text-slate-100 truncate max-w-[190px]" title="${p.nama}">${p.nama}</span>
                 <span class="text-[10px] text-teal-400 font-normal">${p.profesi}</span>
             </td>
         `;
