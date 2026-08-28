@@ -114,7 +114,10 @@ def generate_excel_schedule(year, month):
     
     schedule_map = {}
     for j in jadwals:
-        schedule_map[(j.ruangan_id, j.tanggal)] = j
+        k = (j.ruangan_id, j.tanggal)
+        if k not in schedule_map:
+            schedule_map[k] = []
+        schedule_map[k].append(j)
 
     current_row = 6
     no = 1
@@ -132,14 +135,17 @@ def generate_excel_schedule(year, month):
 
         ws.cell(row=current_row, column=1, value=no).alignment = Alignment(horizontal="center", vertical="center")
         ws.cell(row=current_row, column=1).border = THIN_BORDER
+        no += 1
 
         ws.cell(row=current_row, column=2, value=r.nama).alignment = Alignment(horizontal="left", vertical="center")
         ws.cell(row=current_row, column=2).font = Font(name="Calibri", size=10, bold=True)
         ws.cell(row=current_row, column=2).border = THIN_BORDER
 
-        sample_jadwal = next((j for j in jadwals if j.ruangan_id == r.id), None)
-        staff_name = sample_jadwal.pegawai.nama if sample_jadwal and sample_jadwal.pegawai else "-"
-        ws.cell(row=current_row, column=3, value=staff_name).alignment = Alignment(horizontal="left", vertical="center")
+        room_jadwals = [j for j in jadwals if j.ruangan_id == r.id]
+        staff_names = sorted(list(set(j.pegawai.nama for j in room_jadwals if j.pegawai)))
+        staff_name_str = ", ".join(staff_names[:3]) + (f" (+{len(staff_names)-3})" if len(staff_names) > 3 else "") if staff_names else "-"
+
+        ws.cell(row=current_row, column=3, value=staff_name_str).alignment = Alignment(horizontal="left", vertical="center")
         ws.cell(row=current_row, column=3).font = Font(name="Calibri", size=9)
         ws.cell(row=current_row, column=3).border = THIN_BORDER
 
@@ -155,20 +161,25 @@ def generate_excel_schedule(year, month):
             cell.border = THIN_BORDER
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
-            j = schedule_map.get((r.id, tgl_str))
-            if j and j.shift:
-                shift_code = j.shift.kode
-                cell.value = shift_code
+            list_j = schedule_map.get((r.id, tgl_str), [])
+            if list_j:
+                codes = [j.shift.kode for j in list_j if j.shift]
+                cell.value = ", ".join(codes)
                 
-                hex_color = j.shift.warna_bg.replace('#', '')
-                if len(hex_color) == 6:
-                    cell.fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
-                    cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+                first_j = list_j[0]
+                if first_j.shift:
+                    hex_color = first_j.shift.warna_bg.replace('#', '')
+                    if len(hex_color) == 6:
+                        cell.fill = PatternFill(start_color=hex_color, end_color=hex_color, fill_type="solid")
+                        cell.font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
                 
-                if shift_code == 'P': count_pagi += 1
-                elif shift_code == 'S': count_siang += 1
-                elif shift_code == 'M': count_malam += 1
-                elif shift_code in ['L', 'C']: count_libur += 1
+                for j in list_j:
+                    if j.shift:
+                        sc = j.shift.kode
+                        if sc == 'P': count_pagi += 1
+                        elif sc == 'S': count_siang += 1
+                        elif sc == 'M': count_malam += 1
+                        elif sc in ['L', 'C']: count_libur += 1
             else:
                 cell.value = "-"
                 cell.font = Font(name="Calibri", size=9, color="94A3B8")

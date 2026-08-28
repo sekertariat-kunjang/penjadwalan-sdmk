@@ -507,9 +507,12 @@ function renderKlasterFilterChips() {
     container.innerHTML = chipsHTML;
 }
 
-function showRichTooltip(e, j, tglStr, roomName) {
+function showRichTooltip(e, inputData, tglStr, roomName) {
     const tooltip = document.getElementById('rich-tooltip');
     if (!tooltip) return;
+
+    const listJ = Array.isArray(inputData) ? inputData : [inputData];
+    if (listJ.length === 0) return;
 
     const badge = document.getElementById('tooltip-shift-badge');
     const dateEl = document.getElementById('tooltip-date');
@@ -519,20 +522,34 @@ function showRichTooltip(e, j, tglStr, roomName) {
     const noteEl = document.getElementById('tooltip-note');
     const noteContainer = document.getElementById('tooltip-note-container');
 
-    if (badge) {
-        badge.textContent = `${j.shift_kode} (${j.shift_nama})`;
-        badge.style.backgroundColor = j.warna_bg;
-        badge.style.color = j.warna_text;
-    }
     if (dateEl) dateEl.textContent = `Tgl ${tglStr}`;
-    if (nameEl) nameEl.textContent = j.pegawai_nama || 'Pegawai';
-    if (profesiEl) profesiEl.textContent = j.profesi || 'SDMK';
-    if (roomEl) roomEl.textContent = roomName || j.ruangan_nama || '';
+    if (roomEl) roomEl.textContent = roomName || '';
 
-    if (j.catatan) {
-        if (noteEl) noteEl.textContent = j.catatan;
-        if (noteContainer) noteContainer.classList.remove('hidden');
+    if (listJ.length === 1) {
+        const j = listJ[0];
+        if (badge) {
+            badge.textContent = `${j.shift_kode} (${j.shift_nama})`;
+            badge.style.backgroundColor = j.warna_bg;
+            badge.style.color = j.warna_text;
+        }
+        if (nameEl) nameEl.textContent = j.pegawai_nama || 'Pegawai';
+        if (profesiEl) profesiEl.textContent = j.pegawai_profesi || 'SDMK';
+
+        if (j.catatan) {
+            if (noteEl) noteEl.textContent = j.catatan;
+            if (noteContainer) noteContainer.classList.remove('hidden');
+        } else {
+            if (noteContainer) noteContainer.classList.add('hidden');
+        }
     } else {
+        if (badge) {
+            badge.textContent = `${listJ.length} Petugas`;
+            badge.style.backgroundColor = '#0d9488';
+            badge.style.color = '#ffffff';
+        }
+        const staffListText = listJ.map(j => `<span class="block font-bold text-slate-100">• ${j.pegawai_nama} <span class="text-[10px] text-teal-400 font-normal">(${j.shift_kode} - ${j.shift_nama})</span></span>`).join('');
+        if (nameEl) nameEl.innerHTML = staffListText;
+        if (profesiEl) profesiEl.textContent = 'Multi Petugas Jaga';
         if (noteContainer) noteContainer.classList.add('hidden');
     }
 
@@ -709,7 +726,9 @@ function renderMatrixKlaster() {
 
     const scheduleMap = {};
     state.jadwal_list.forEach(j => {
-        scheduleMap[`${j.ruangan_id}_${j.tanggal}`] = j;
+        const k = `${j.ruangan_id}_${j.tanggal}`;
+        if (!scheduleMap[k]) scheduleMap[k] = [];
+        scheduleMap[k].push(j);
     });
 
     const isLocked = state.status_jadwal.status === 'FINAL';
@@ -734,30 +753,33 @@ function renderMatrixKlaster() {
         for (let day = 1; day <= state.num_days; day++) {
             const tglStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const key = `${r.id}_${tglStr}`;
-            const j = scheduleMap[key];
+            const listJ = scheduleMap[key] || [];
 
             let cellContent = '-';
             let staffTitle = '';
 
-            if (j) {
-                const shiftCode = j.shift_kode;
-                const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
+            if (listJ.length > 0) {
+                staffTitle = listJ.map(j => `${j.pegawai_nama} (${j.shift_nama})`).join(', ');
 
                 if (state.viewMode === 'compact') {
-                    cellContent = `
-                        <div class="px-1 py-1 rounded text-[10px] font-black text-center border border-white/10 shadow-sm transition hover:scale-105" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                            <span>${shiftCode}</span>
+                    const badgesHTML = listJ.map(j => `
+                        <div class="px-1 py-0.5 rounded text-[10px] font-black text-center border border-white/10 shadow-sm transition hover:scale-105 inline-block" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                            <span>${j.shift_kode}</span>
                         </div>
-                    `;
+                    `).join('');
+                    cellContent = `<div class="flex flex-wrap gap-0.5 justify-center items-center">${badgesHTML}</div>`;
                 } else {
-                    cellContent = `
-                        <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                            <span>${shiftCode}</span>
-                            <span class="block text-[9px] font-normal truncate opacity-90">${staffName}</span>
-                        </div>
-                    `;
+                    const badgesHTML = listJ.map(j => {
+                        const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
+                        return `
+                            <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow-sm my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                                <span>${j.shift_kode}</span>
+                                <span class="block text-[9px] font-normal truncate opacity-90">${staffName}</span>
+                            </div>
+                        `;
+                    }).join('');
+                    cellContent = `<div class="space-y-0.5">${badgesHTML}</div>`;
                 }
-                staffTitle = `${j.pegawai_nama} (${j.shift_nama})`;
             }
 
             const canEdit = !isLocked && (userRole === 'admin' || userRole === 'kapus');
@@ -783,13 +805,13 @@ function renderMatrixKlaster() {
 
                 cellTd.classList.add('crosshair-cell-active');
 
-                if (j) {
-                    showRichTooltip(e, j, tglStr, r.nama);
+                if (listJ.length > 0) {
+                    showRichTooltip(e, listJ, tglStr, r.nama);
                 }
             });
 
             cellTd.addEventListener('mousemove', (e) => {
-                if (j) moveRichTooltip(e);
+                if (listJ.length > 0) moveRichTooltip(e);
             });
 
             cellTd.addEventListener('mouseleave', () => {
@@ -1142,45 +1164,52 @@ function attachDropzoneListeners() {
 // -------------------------------------------------------------
 // MODALS LOGIC
 // -------------------------------------------------------------
+// -------------------------------------------------------------
+// MODALS LOGIC (MULTI-STAFF SUPPORTED)
+// -------------------------------------------------------------
 function openCellModal(tanggal, ruanganId) {
     if (state.status_jadwal.status === 'FINAL') {
-        alert('Jadwal sudah FINAL & terkunci oleh Kepala Puskesmas!');
+        alert('Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!');
         return;
     }
 
-    state.selectedCell = { tanggal, ruangan_id: ruanganId };
+    state.selectedCell = { tanggal: tanggal, ruangan_id: parseInt(ruanganId) };
 
     const ruangan = state.ruangan_list.find(r => r.id == ruanganId);
-    document.getElementById('modal-cell-info').textContent = `${tanggal} | ${ruangan ? ruangan.nama : ''}`;
-
-    const selectPegawai = document.getElementById('modal-cell-pegawai');
-    selectPegawai.innerHTML = '';
-    state.pegawai_list.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.nama} (${p.profesi})`;
-        selectPegawai.appendChild(opt);
-    });
-
-    const selectShift = document.getElementById('modal-cell-shift');
-    selectShift.innerHTML = '';
-    state.shift_list.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s.id;
-        opt.textContent = `${s.nama} (${s.kode}) - ${s.jam_masuk} s.d ${s.jam_keluar}`;
-        selectShift.appendChild(opt);
-    });
-
-    const existing = state.jadwal_list.find(j => j.tanggal === tanggal && j.ruangan_id == ruanganId);
-    if (existing) {
-        selectPegawai.value = existing.pegawai_id;
-        selectShift.value = existing.shift_id;
-        document.getElementById('modal-cell-catatan').value = existing.catatan || '';
-    } else {
-        document.getElementById('modal-cell-catatan').value = '';
+    const infoDiv = document.getElementById('modal-cell-info');
+    if (infoDiv) {
+        infoDiv.textContent = `${ruangan ? ruangan.nama : 'Layanan'} (${ruangan ? ruangan.kode : ''}) - Tanggal: ${tanggal}`;
     }
 
+    // Populate Select Pegawai
+    const selectPegawai = document.getElementById('modal-cell-pegawai');
+    if (selectPegawai) {
+        selectPegawai.innerHTML = '';
+        state.pegawai_list.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = `${p.nama} (${p.profesi})`;
+            selectPegawai.appendChild(opt);
+        });
+    }
+
+    // Populate Select Shift
+    const selectShift = document.getElementById('modal-cell-shift');
+    if (selectShift) {
+        selectShift.innerHTML = '';
+        state.shift_list.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `${s.nama} (${s.kode}) - ${s.jam_masuk || ''} s.d ${s.jam_keluar || ''}`;
+            selectShift.appendChild(opt);
+        });
+    }
+
+    renderCellAssignedList();
+    resetCellForm();
+
     document.getElementById('modal-cell').classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
 }
 
 function closeCellModal() {
@@ -1188,53 +1217,148 @@ function closeCellModal() {
     state.selectedCell = null;
 }
 
-async function saveCellSchedule() {
-    if (!state.selectedCell) return;
+function renderCellAssignedList() {
+    const listContainer = document.getElementById('modal-cell-assigned-list');
+    if (!listContainer || !state.selectedCell) return;
 
-    const pegawaiId = document.getElementById('modal-cell-pegawai').value;
-    const shiftId = document.getElementById('modal-cell-shift').value;
-    const catatan = document.getElementById('modal-cell-catatan').value;
+    const { tanggal, ruangan_id } = state.selectedCell;
+    const assigned = state.jadwal_list.filter(j => j.ruangan_id == ruangan_id && j.tanggal === tanggal);
 
-    const res = await fetch('/api/jadwal/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            tanggal: state.selectedCell.tanggal,
-            ruangan_id: parseInt(state.selectedCell.ruangan_id),
-            pegawai_id: parseInt(pegawaiId),
-            shift_id: parseInt(shiftId),
-            catatan: catatan
-        })
-    });
+    listContainer.innerHTML = '';
 
-    const data = await res.json();
-    if (data.status !== 'success') {
-        alert(data.message || 'Gagal menyimpan jadwal');
+    if (assigned.length === 0) {
+        listContainer.innerHTML = `
+            <div class="p-2 text-center text-xs text-slate-500 italic bg-slate-950/40 rounded-lg border border-slate-800">
+                Belum ada petugas bertugas di layanan ini pada tanggal tersebut.
+            </div>
+        `;
+        return;
     }
 
-    closeCellModal();
-    loadDashboardData();
+    assigned.forEach(j => {
+        const item = document.createElement('div');
+        item.className = 'p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs gap-2';
+        
+        const noteText = j.catatan ? `<span class="text-slate-400 block text-[10px] italic">Catatan: ${j.catatan}</span>` : '';
+
+        item.innerHTML = `
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                    ${j.shift_kode}
+                </span>
+                <div class="min-w-0">
+                    <span class="font-bold text-slate-200 block truncate text-[11px]">${j.pegawai_nama}</span>
+                    <span class="text-[10px] text-teal-400 font-medium block">${j.pegawai_profesi || 'SDMK'}</span>
+                    ${noteText}
+                </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+                <button onclick="editAssignmentInModal(${j.id}, ${j.pegawai_id}, ${j.shift_id}, '${(j.catatan || '').replace(/'/g, "\\'")}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 text-[10px] font-semibold transition border border-slate-700">
+                    Edit
+                </button>
+                <button onclick="deleteAssignmentById(${j.id})" class="px-2 py-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 text-[10px] font-semibold border border-rose-800 transition">
+                    Hapus
+                </button>
+            </div>
+        `;
+        listContainer.appendChild(item);
+    });
 }
 
-async function deleteCellSchedule() {
+function editAssignmentInModal(id, pegawai_id, shift_id, catatan) {
+    document.getElementById('modal-cell-jadwal-id').value = id;
+    document.getElementById('modal-cell-pegawai').value = pegawai_id;
+    document.getElementById('modal-cell-shift').value = shift_id;
+    document.getElementById('modal-cell-catatan').value = catatan || '';
+    
+    document.getElementById('modal-form-title').textContent = '✏️ Edit Penugasan Pegawai';
+    document.getElementById('btn-cancel-edit-assignment').classList.remove('hidden');
+    
+    const errDiv = document.getElementById('modal-cell-error');
+    if (errDiv) errDiv.classList.add('hidden');
+}
+
+function resetCellForm() {
+    document.getElementById('modal-cell-jadwal-id').value = '';
+    document.getElementById('modal-cell-catatan').value = '';
+    document.getElementById('modal-form-title').textContent = '+ Tambah Penugasan Pegawai';
+    document.getElementById('btn-cancel-edit-assignment').classList.add('hidden');
+    
+    const errDiv = document.getElementById('modal-cell-error');
+    if (errDiv) errDiv.classList.add('hidden');
+}
+
+async function saveCellSchedule() {
     if (!state.selectedCell) return;
+    
+    const jadwal_id = document.getElementById('modal-cell-jadwal-id').value;
+    const pegawai_id = parseInt(document.getElementById('modal-cell-pegawai').value);
+    const shift_id = parseInt(document.getElementById('modal-cell-shift').value);
+    const catatan = document.getElementById('modal-cell-catatan').value.trim();
+    
+    const errDiv = document.getElementById('modal-cell-error');
+    const errMsg = document.getElementById('modal-cell-error-msg');
 
-    const res = await fetch('/api/jadwal/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            tanggal: state.selectedCell.tanggal,
-            ruangan_id: parseInt(state.selectedCell.ruangan_id)
-        })
-    });
-
-    const data = await res.json();
-    if (data.status !== 'success') {
-        alert(data.message || 'Gagal menghapus jadwal');
+    if (!pegawai_id || !shift_id) {
+        if (errMsg) errMsg.textContent = 'Harap pilih pegawai dan shift!';
+        if (errDiv) errDiv.classList.remove('hidden');
+        return;
     }
 
-    closeCellModal();
-    loadDashboardData();
+    const payload = {
+        tanggal: state.selectedCell.tanggal,
+        ruangan_id: state.selectedCell.ruangan_id,
+        pegawai_id: pegawai_id,
+        shift_id: shift_id,
+        catatan: catatan
+    };
+
+    if (jadwal_id) {
+        payload.jadwal_id = parseInt(jadwal_id);
+    }
+
+    try {
+        const res = await fetch('/api/jadwal/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (data.status === 'success') {
+            resetCellForm();
+            await loadDashboardData();
+            renderCellAssignedList();
+        } else {
+            if (errMsg) errMsg.textContent = data.message || 'Gagal menyimpan penugasan!';
+            if (errDiv) errDiv.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error("Save cell schedule error:", err);
+        if (errMsg) errMsg.textContent = 'Terjadi kesalahan koneksi server!';
+        if (errDiv) errDiv.classList.remove('hidden');
+    }
+}
+
+async function deleteAssignmentById(jadwal_id) {
+    if (!confirm('Apakah Anda yakin ingin menghapus penugasan ini?')) return;
+
+    try {
+        const res = await fetch('/api/jadwal/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jadwal_id: jadwal_id })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            await loadDashboardData();
+            renderCellAssignedList();
+        } else {
+            alert(data.message || 'Gagal menghapus penugasan');
+        }
+    } catch (err) {
+        console.error("Delete assignment error:", err);
+    }
 }
 
 // Bulk Modal Logic

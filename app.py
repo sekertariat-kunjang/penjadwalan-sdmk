@@ -175,6 +175,7 @@ def delete_ruangan():
 @app.route('/api/jadwal/update', methods=['POST'])
 def update_jadwal():
     data = request.json or {}
+    jadwal_id = data.get('jadwal_id')
     tanggal = data.get('tanggal')
     ruangan_id = data.get('ruangan_id')
     pegawai_id = data.get('pegawai_id')
@@ -194,20 +195,49 @@ def update_jadwal():
     if curr_user and curr_user.role == 'pegawai':
         return jsonify({'status': 'error', 'message': 'Pegawai biasa tidak memiliki akses mengubah jadwal!'}), 403
 
-    existing = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id).first()
-    if existing:
-        existing.pegawai_id = pegawai_id
-        existing.shift_id = shift_id
-        existing.catatan = catatan
+    # Check if staff member is ALREADY assigned on this date elsewhere
+    existing_staff_assignment = Jadwal.query.filter_by(tanggal=tanggal, pegawai_id=pegawai_id).first()
+
+    if jadwal_id:
+        target_j = Jadwal.query.get(jadwal_id)
+        if not target_j:
+            return jsonify({'status': 'error', 'message': 'Jadwal tidak ditemukan'}), 404
+        
+        if existing_staff_assignment and existing_staff_assignment.id != target_j.id:
+            peg_name = existing_staff_assignment.pegawai.nama if existing_staff_assignment.pegawai else 'Pegawai'
+            room_name = existing_staff_assignment.ruangan.nama if existing_staff_assignment.ruangan else 'Layanan lain'
+            shift_code = existing_staff_assignment.shift.kode if existing_staff_assignment.shift else ''
+            return jsonify({
+                'status': 'error',
+                'message': f'Gagal! {peg_name} sudah bertugas di {room_name} (Shift {shift_code}) pada tanggal {tanggal}. Seorang pegawai tidak dapat ditugaskan 2 kali pada tanggal yang sama.'
+            }), 400
+
+        target_j.ruangan_id = ruangan_id
+        target_j.shift_id = shift_id
+        target_j.catatan = catatan
     else:
-        new_j = Jadwal(
-            tanggal=tanggal,
-            ruangan_id=ruangan_id,
-            pegawai_id=pegawai_id,
-            shift_id=shift_id,
-            catatan=catatan
-        )
-        db.session.add(new_j)
+        if existing_staff_assignment:
+            peg_name = existing_staff_assignment.pegawai.nama if existing_staff_assignment.pegawai else 'Pegawai'
+            room_name = existing_staff_assignment.ruangan.nama if existing_staff_assignment.ruangan else 'Layanan lain'
+            shift_code = existing_staff_assignment.shift.kode if existing_staff_assignment.shift else ''
+            return jsonify({
+                'status': 'error',
+                'message': f'Gagal! {peg_name} sudah bertugas di {room_name} (Shift {shift_code}) pada tanggal {tanggal}. Seorang pegawai tidak dapat ditugaskan 2 kali pada tanggal yang sama.'
+            }), 400
+
+        existing_in_room = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id, pegawai_id=pegawai_id).first()
+        if existing_in_room:
+            existing_in_room.shift_id = shift_id
+            existing_in_room.catatan = catatan
+        else:
+            new_j = Jadwal(
+                tanggal=tanggal,
+                ruangan_id=ruangan_id,
+                pegawai_id=pegawai_id,
+                shift_id=shift_id,
+                catatan=catatan
+            )
+            db.session.add(new_j)
 
     db.session.commit()
     return jsonify({'status': 'success', 'message': 'Jadwal berhasil diperbarui'})
@@ -215,28 +245,48 @@ def update_jadwal():
 @app.route('/api/jadwal/delete', methods=['POST'])
 def delete_jadwal():
     data = request.json or {}
+    jadwal_id = data.get('jadwal_id')
     tanggal = data.get('tanggal')
     ruangan_id = data.get('ruangan_id')
-
-    if not (tanggal and ruangan_id):
-        return jsonify({'status': 'error', 'message': 'Data tidak lengkap'}), 400
-
-    dt = datetime.strptime(tanggal, '%Y-%m-%d')
-    st_obj = get_or_create_status(dt.year, dt.month)
-    
-    if st_obj.status == 'FINAL':
-        return jsonify({'status': 'error', 'message': 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'}), 403
+    pegawai_id = data.get('pegawai_id')
 
     curr_user = get_current_user()
     if curr_user and curr_user.role == 'pegawai':
         return jsonify({'status': 'error', 'message': 'Pegawai biasa tidak memiliki akses menghapus jadwal!'}), 403
 
-    existing = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id).first()
-    if existing:
-        db.session.delete(existing)
-        db.session.commit()
+    if jadwal_id:
+        target = Jadwal.query.get(jadwal_id)
+        if target:
+            dt = datetime.strptime(target.tanggal, '%Y-%m-%d')
+            st_obj = get_or_create_status(dt.year, dt.month)
+            if st_obj.status == 'FINAL':
+                return jsonify({'status': 'error', 'message': 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'}), 403
 
-    return jsonify({'status': 'success', 'message': 'Jadwal berhasil dihapus'})
+            db.session.delete(target)
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': 'Jadwal berhasil dihapus'})
+    elif tanggal and ruangan_id and pegawai_id:
+        target = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id, pegawai_id=pegawai_id).first()
+        if target:
+            dt = datetime.strptime(tanggal, '%Y-%m-%d')
+            st_obj = get_or_create_status(dt.year, dt.month)
+            if st_obj.status == 'FINAL':
+                return jsonify({'status': 'error', 'message': 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'}), 403
+
+            db.session.delete(target)
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': 'Jadwal berhasil dihapus'})
+    elif tanggal and ruangan_id:
+        dt = datetime.strptime(tanggal, '%Y-%m-%d')
+        st_obj = get_or_create_status(dt.year, dt.month)
+        if st_obj.status == 'FINAL':
+            return jsonify({'status': 'error', 'message': 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'}), 403
+
+        Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id).delete()
+        db.session.commit()
+        return jsonify({'status': 'success', 'message': 'Semua penugasan di layanan ini pada tanggal tersebut berhasil dihapus'})
+
+    return jsonify({'status': 'error', 'message': 'Data jadwal tidak ditemukan'}), 404
 
 @app.route('/api/jadwal/bulk', methods=['POST'])
 def bulk_jadwal():
@@ -264,25 +314,45 @@ def bulk_jadwal():
     if curr_user and curr_user.role == 'pegawai':
         return jsonify({'status': 'error', 'message': 'Pegawai biasa tidak memiliki akses bulk mapping!'}), 403
 
+    peg = Pegawai.query.get(pegawai_id)
+    peg_name = peg.nama if peg else 'Pegawai'
+
+    conflicts_skipped = []
+    applied_count = 0
+
     curr = d_start
     while curr <= d_end:
         tgl_str = curr.strftime('%Y-%m-%d')
-        existing = Jadwal.query.filter_by(tanggal=tgl_str, ruangan_id=ruangan_id).first()
-        if existing:
-            existing.pegawai_id = pegawai_id
-            existing.shift_id = shift_id
+        
+        # Check existing assignment for staff on this date
+        existing_assignment = Jadwal.query.filter_by(tanggal=tgl_str, pegawai_id=pegawai_id).first()
+        
+        if existing_assignment and existing_assignment.ruangan_id != ruangan_id:
+            conflicts_skipped.append(tgl_str)
         else:
-            new_j = Jadwal(
-                tanggal=tgl_str,
-                ruangan_id=ruangan_id,
-                pegawai_id=pegawai_id,
-                shift_id=shift_id
-            )
-            db.session.add(new_j)
+            if existing_assignment:
+                existing_assignment.shift_id = shift_id
+            else:
+                new_j = Jadwal(
+                    tanggal=tgl_str,
+                    ruangan_id=ruangan_id,
+                    pegawai_id=pegawai_id,
+                    shift_id=shift_id
+                )
+                db.session.add(new_j)
+            applied_count += 1
+
         curr = datetime.fromordinal(curr.toordinal() + 1)
 
     db.session.commit()
-    return jsonify({'status': 'success', 'message': 'Bulk mapping jadwal berhasil diterapkan'})
+
+    if len(conflicts_skipped) > 0:
+        return jsonify({
+            'status': 'warning',
+            'message': f'Bulk mapping diterapkan untuk {applied_count} tanggal. {len(conflicts_skipped)} tanggal dilewati karena {peg_name} sudah bertugas di layanan lain.'
+        })
+
+    return jsonify({'status': 'success', 'message': f'Bulk mapping berhasil diterapkan untuk {applied_count} tanggal!'})
 
 # -------------------------------------------------------------
 # APPROVAL WORKFLOW ENDPOINT
