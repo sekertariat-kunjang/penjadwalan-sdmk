@@ -726,7 +726,7 @@ function renderMatrixKlaster() {
         const isSunday = dayIdx === 0;
 
         headerHTML += `
-            <th class="p-1 w-12 text-center border-r border-slate-800/60 font-semibold ${isSunday ? 'bg-rose-950/40 text-rose-400' : ''}" data-day="${day}">
+            <th class="p-1.5 min-w-[54px] text-center border-r border-slate-800/60 font-semibold ${isSunday ? 'bg-rose-950/40 text-rose-400' : ''}" data-day="${day}">
                 <span class="block text-[10px] text-slate-400">${dayName}</span>
                 <span class="text-xs font-bold">${day}</span>
             </th>
@@ -779,22 +779,22 @@ function renderMatrixKlaster() {
 
                 if (state.viewMode === 'compact') {
                     const badgesHTML = listJ.map(j => `
-                        <div class="px-1 py-0.5 rounded text-[10px] font-black text-center border border-white/10 shadow-sm transition hover:scale-105 inline-block" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                        <div class="px-2 py-1 rounded-md text-xs font-black text-center border border-white/10 shadow transition hover:scale-105 inline-block" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
                             <span>${j.shift_kode}</span>
                         </div>
                     `).join('');
-                    cellContent = `<div class="flex flex-wrap gap-0.5 justify-center items-center">${badgesHTML}</div>`;
+                    cellContent = `<div class="flex flex-wrap gap-1 justify-center items-center">${badgesHTML}</div>`;
                 } else {
                     const badgesHTML = listJ.map(j => {
                         const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
                         return `
-                            <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow-sm my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                                <span>${j.shift_kode}</span>
-                                <span class="block text-[9px] font-normal truncate opacity-90">${staffName}</span>
+                            <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                                <span class="font-extrabold text-xs block">${j.shift_kode}</span>
+                                <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffName}</span>
                             </div>
                         `;
                     }).join('');
-                    cellContent = `<div class="space-y-0.5">${badgesHTML}</div>`;
+                    cellContent = `<div class="space-y-1">${badgesHTML}</div>`;
                 }
             }
 
@@ -873,9 +873,9 @@ function renderMatrixKlaster() {
             const badges = offJadwals.map(j => {
                 const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
                 return `
-                    <div class="px-1 py-0.5 rounded text-[9px] font-extrabold text-center border border-white/10 my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                    <div class="px-1.5 py-0.5 rounded-md text-xs font-black text-center border border-white/10 my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
                         <span>${j.shift_kode}</span>
-                        <span class="block text-[8px] font-normal truncate opacity-90">${staffName}</span>
+                        <span class="block text-[9px] font-semibold truncate opacity-90 leading-tight">${staffName}</span>
                     </div>
                 `;
             }).join('');
