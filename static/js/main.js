@@ -779,23 +779,57 @@ function renderMatrixKlaster() {
                 staffTitle = listJ.map(j => `${j.pegawai_nama} (${j.shift_nama})`).join(', ');
 
                 if (state.viewMode === 'compact') {
-                    const badgesHTML = listJ.map(j => `
-                        <div class="px-2 py-1 rounded-md text-xs font-black text-center border border-white/10 shadow transition hover:scale-105 inline-block" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                    // Mode Ringkas: Side-by-side compact shift badges in 1 single line
+                    const visibleJ = listJ.slice(0, 2);
+                    const extraCount = listJ.length - visibleJ.length;
+
+                    const badgesHTML = visibleJ.map(j => `
+                        <div class="px-1.5 py-0.5 rounded text-[11px] font-black text-center border border-white/10 shadow-sm inline-block" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
                             <span>${j.shift_kode}</span>
                         </div>
                     `).join('');
-                    cellContent = `<div class="flex flex-wrap gap-1 justify-center items-center">${badgesHTML}</div>`;
+
+                    const extraBadge = extraCount > 0 ? `
+                        <span class="px-1 py-0.5 rounded bg-slate-800 text-teal-300 border border-slate-700 text-[10px] font-bold shrink-0">
+                            +${extraCount}
+                        </span>
+                    ` : '';
+
+                    cellContent = `<div class="flex items-center justify-center gap-0.5 flex-nowrap">${badgesHTML}${extraBadge}</div>`;
                 } else {
-                    const badgesHTML = listJ.map(j => {
+                    // Mode Detail: Compact horizontal side-by-side badges in 1 single line to keep row height uniform
+                    if (listJ.length === 1) {
+                        const j = listJ[0];
                         const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
-                        return `
-                            <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                                <span class="font-extrabold text-xs block">${j.shift_kode}</span>
-                                <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffName}</span>
+                        cellContent = `
+                            <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                                <span class="font-extrabold text-xs block leading-none">${j.shift_kode}</span>
+                                <span class="block text-[9px] font-semibold truncate opacity-95 mt-0.5 leading-tight">${staffName}</span>
                             </div>
                         `;
-                    }).join('');
-                    cellContent = `<div class="space-y-1">${badgesHTML}</div>`;
+                    } else {
+                        // Multi-Staff (2+): Horizontal side-by-side in 1 line to prevent row height expansion
+                        const visibleJ = listJ.slice(0, 2);
+                        const extraCount = listJ.length - visibleJ.length;
+
+                        const badgesHTML = visibleJ.map(j => {
+                            const staffName = j.pegawai_nama ? j.pegawai_nama.split(' ')[0] : '';
+                            return `
+                                <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 overflow-hidden shadow max-w-[42px] shrink-0" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                                    <span class="font-black text-[10px] block leading-none">${j.shift_kode}</span>
+                                    <span class="block text-[8px] font-semibold truncate opacity-90 leading-tight mt-0.5">${staffName}</span>
+                                </div>
+                            `;
+                        }).join('');
+
+                        const extraPill = extraCount > 0 ? `
+                            <div class="px-1 py-1 rounded bg-teal-500/20 text-teal-300 border border-teal-500/40 text-[9px] font-extrabold shrink-0 shadow-sm">
+                                +${extraCount}
+                            </div>
+                        ` : '';
+
+                        cellContent = `<div class="flex items-center justify-center gap-0.5 flex-nowrap">${badgesHTML}${extraPill}</div>`;
+                    }
                 }
             }
 
