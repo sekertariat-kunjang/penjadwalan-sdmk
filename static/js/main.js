@@ -22,6 +22,22 @@ const state = {
 
 const INDONESIAN_DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
+function getStaffInitials(fullName) {
+    if (!fullName) return '?';
+    let cleanName = fullName
+        .replace(/^(drg\.|dr\.|Bdn\.|Ns\.|apt\.)\s+/gi, '')
+        .replace(/,\s*.*$/g, '')
+        .trim();
+
+    const parts = cleanName.split(/\s+/).filter(p => p.length > 0);
+    if (parts.length === 1) {
+        return parts[0].substring(0, 2).toUpperCase();
+    } else if (parts.length >= 2) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return cleanName.substring(0, 2).toUpperCase();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // Initialize date selects
     const selectMonth = document.getElementById('select-month');
@@ -777,42 +793,44 @@ function renderMatrixKlaster() {
 
             if (listJ.length > 0) {
                 const primaryJ = listJ[0];
-                const shiftCodes = Array.from(new Set(listJ.map(j => j.shift_kode))).join('/');
+                const primaryInitials = getStaffInitials(primaryJ.pegawai_nama);
+                const staffFirstName = primaryJ.pegawai_nama ? primaryJ.pegawai_nama.split(' ')[0] : '';
                 const isMulti = listJ.length > 1;
                 const extraCount = listJ.length - 1;
 
                 if (state.viewMode === 'compact') {
+                    // Mode Ringkas: Staff Initials on Color-Coded Shift Background!
                     if (isMulti) {
                         cellContent = `
-                            <div class="px-1.5 py-1 rounded-md text-xs font-black border-2 border-amber-400/80 shadow inline-flex items-center gap-1 transition hover:scale-105 select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
-                                <span>${shiftCodes}</span>
+                            <div class="px-1.5 py-1 rounded-md text-xs font-black border-2 border-amber-400/80 shadow inline-flex items-center gap-1 transition hover:scale-105 select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}" title="${primaryJ.pegawai_nama} (${primaryJ.shift_nama})">
+                                <span>${primaryInitials}</span>
                                 <span class="px-1 text-[9px] bg-amber-400 text-slate-950 font-black rounded-full shrink-0" title="${listJ.length} Petugas Jaga">+${extraCount}</span>
                             </div>
                         `;
                     } else {
                         cellContent = `
-                            <div class="px-2 py-1 rounded-md text-xs font-black text-center border border-white/10 shadow transition hover:scale-105 inline-block select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
-                                <span>${shiftCodes}</span>
+                            <div class="px-2 py-1 rounded-md text-xs font-black text-center border border-white/10 shadow transition hover:scale-105 inline-block select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}" title="${primaryJ.pegawai_nama} (${primaryJ.shift_nama})">
+                                <span>${primaryInitials}</span>
                             </div>
                         `;
                     }
                 } else {
-                    const staffFirstName = primaryJ.pegawai_nama ? primaryJ.pegawai_nama.split(' ')[0] : '';
+                    // Mode Detail: Main Title = Staff Name, Subtitle = Shift Name!
                     if (isMulti) {
                         cellContent = `
-                            <div class="px-1.5 py-1 rounded-md text-xs font-bold border-2 border-amber-400/80 overflow-hidden shadow flex items-center justify-between gap-1 select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
-                                <div class="flex items-center gap-1 min-w-0">
-                                    <span class="font-black text-xs shrink-0">${shiftCodes}</span>
-                                    <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                            <div class="px-1.5 py-0.5 rounded-md text-xs font-bold border-2 border-amber-400/80 overflow-hidden shadow flex items-center justify-between gap-1 select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                                <div class="min-w-0 text-left">
+                                    <span class="font-extrabold text-[11px] block truncate leading-tight">${staffFirstName}</span>
+                                    <span class="block text-[9px] font-medium opacity-90 leading-tight">${primaryJ.shift_nama}</span>
                                 </div>
                                 <span class="px-1 text-[9px] bg-amber-400 text-slate-950 font-black rounded-full shrink-0" title="${listJ.length} Petugas Jaga">+${extraCount}</span>
                             </div>
                         `;
                     } else {
                         cellContent = `
-                            <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
-                                <span class="font-black text-xs block">${shiftCodes}</span>
-                                <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                            <div class="px-1.5 py-0.5 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow select-none" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                                <span class="font-extrabold text-[11px] block truncate leading-tight">${staffFirstName}</span>
+                                <span class="block text-[9px] font-medium opacity-90 leading-tight">${primaryJ.shift_nama}</span>
                             </div>
                         `;
                     }
@@ -897,19 +915,19 @@ function renderMatrixKlaster() {
 
             if (isMultiOff) {
                 cellContent = `
-                    <div class="px-1.5 py-1 rounded-md text-xs font-bold border-2 border-emerald-400/70 overflow-hidden shadow flex items-center justify-between gap-1 select-none" style="background-color: ${primaryOff.warna_bg}; color: ${primaryOff.warna_text}">
-                        <div class="flex items-center gap-1 min-w-0">
-                            <span class="font-black text-xs shrink-0">${primaryOff.shift_kode}</span>
-                            <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                    <div class="px-1.5 py-0.5 rounded-md text-xs font-bold border-2 border-emerald-400/70 overflow-hidden shadow flex items-center justify-between gap-1 select-none" style="background-color: ${primaryOff.warna_bg}; color: ${primaryOff.warna_text}">
+                        <div class="min-w-0 text-left">
+                            <span class="font-extrabold text-[11px] block truncate leading-tight">${staffFirstName}</span>
+                            <span class="block text-[9px] font-medium opacity-90 leading-tight">${primaryOff.shift_nama}</span>
                         </div>
                         <span class="px-1 text-[9px] bg-emerald-400 text-slate-950 font-black rounded-full shrink-0">+${extraOff}</span>
                     </div>
                 `;
             } else {
                 cellContent = `
-                    <div class="px-1.5 py-1 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow select-none" style="background-color: ${primaryOff.warna_bg}; color: ${primaryOff.warna_text}">
-                        <span class="font-black text-xs block">${primaryOff.shift_kode}</span>
-                        <span class="block text-[10px] font-semibold truncate opacity-95 leading-tight">${staffFirstName}</span>
+                    <div class="px-1.5 py-0.5 rounded-md text-xs font-bold text-center border border-white/10 overflow-hidden shadow select-none" style="background-color: ${primaryOff.warna_bg}; color: ${primaryOff.warna_text}">
+                        <span class="font-extrabold text-[11px] block truncate leading-tight">${staffFirstName}</span>
+                        <span class="block text-[9px] font-medium opacity-90 leading-tight">${primaryOff.shift_nama}</span>
                     </div>
                 `;
             }
