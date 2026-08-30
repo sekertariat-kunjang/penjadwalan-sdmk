@@ -25,11 +25,14 @@ class STATUS:
 
 SHIFT_OFF_CODES = {'L', 'C'}  # Libur & Cuti — tidak memerlukan ruangan
 
+basedir = os.path.abspath(os.path.dirname(__file__))
+db_path = os.path.join(basedir, 'instance', 'puskesmas_sdmk.db')
+
 app = Flask(__name__)
 # SECRET_KEY diambil dari environment variable; fallback ke random bytes saat dev
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY') or os.urandom(32)
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get(
-    'DATABASE_URL', 'sqlite:///puskesmas_sdmk.db'
+    'DATABASE_URL', f'sqlite:///{db_path}'
 )
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
