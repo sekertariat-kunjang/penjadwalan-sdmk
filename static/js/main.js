@@ -1,9 +1,9 @@
 // Application Global State
 const state = {
     year: new Date().getFullYear(),
-    month: 8, // Default August
+    month: new Date().getMonth() + 1, // bulan saat ini (1-12)
     num_days: 31,
-    month_name: 'Agustus',
+    month_name: '',
     current_user: null, // { id, username, role, pegawai_id, pegawai_nama }
     status_jadwal: { status: 'DRAFT', approved_by: '', approved_at: '' },
     pegawai_list: [],
@@ -21,6 +21,17 @@ const state = {
 };
 
 const INDONESIAN_DAYS = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+
+function escapeHtml(str) {
+    if (str === null || str === undefined) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 
 function getStaffInitials(fullName) {
     if (!fullName) return '?';
@@ -119,11 +130,15 @@ function renderUserProfile() {
         if (u.role === 'admin') roleColor = 'bg-teal-950 text-teal-400 border-teal-800';
         else if (u.role === 'kapus') roleColor = 'bg-amber-950 text-amber-400 border-amber-800';
 
+        // Escape data dari server sebelum dimasukkan ke innerHTML (cegah XSS)
+        const safeName = escapeHtml(u.pegawai_nama);
+        const safeRole = escapeHtml(u.role.toUpperCase());
+
         container.innerHTML = `
             <div class="flex items-center gap-2">
                 <div class="text-right hidden sm:block">
-                    <span class="text-xs font-bold text-slate-200 block truncate max-w-[140px]">${u.pegawai_nama}</span>
-                    <span class="text-[10px] px-1.5 py-0.2 rounded border font-semibold ${roleColor}">${u.role.toUpperCase()}</span>
+                    <span class="text-xs font-bold text-slate-200 block truncate max-w-[140px]">${safeName}</span>
+                    <span class="text-[10px] px-1.5 py-0.2 rounded border font-semibold ${roleColor}">${safeRole}</span>
                 </div>
                 <button onclick="submitLogout()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition" title="Logout">
                     <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
@@ -239,8 +254,9 @@ async function updateScheduleStatus(action) {
 // Enforce Role & Locking Restrictions on UI
 function applyRoleAndLockingRestrictions() {
     const sidebar = document.getElementById('sidebar-palette-container');
-    const btnBulk = document.getElementById('btn-bulk-mapping');
     const btnManageLayanan = document.getElementById('btn-manage-layanan');
+    const btnImportExcel = document.getElementById('btn-import-excel');
+
     const isLocked = state.status_jadwal.status === 'FINAL';
     const userRole = state.current_user ? state.current_user.role : 'pegawai';
 
@@ -250,17 +266,19 @@ function applyRoleAndLockingRestrictions() {
             sidebar.classList.remove('hidden');
             state.isSidebarOpen = false;
         }
-        if (btnBulk) btnBulk.classList.add('hidden');
         if (btnManageLayanan) btnManageLayanan.classList.add('hidden');
+        if (btnImportExcel) btnImportExcel.classList.add('hidden');
     } else {
         if (sidebar) {
             sidebar.classList.remove('hidden');
             sidebar.classList.remove('collapsed');
             state.isSidebarOpen = true;
         }
-        if (btnBulk) btnBulk.classList.remove('hidden');
         if (btnManageLayanan) btnManageLayanan.classList.remove('hidden');
+        if (btnImportExcel) btnImportExcel.classList.remove('hidden');
     }
+
+
 
     const icon = document.getElementById('icon-toggle-sidebar');
     const btnToggle = document.getElementById('btn-toggle-sidebar');
@@ -302,20 +320,74 @@ function renderRuanganManagerList() {
     if (!container) return;
 
     container.innerHTML = '';
+    if (!state.ruangan_list || state.ruangan_list.length === 0) {
+        container.innerHTML = `<div class="p-3 text-center text-slate-500 italic">Belum ada layanan terdaftar</div>`;
+        return;
+    }
+
     state.ruangan_list.forEach(r => {
         const card = document.createElement('div');
-        card.className = 'p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs';
+        card.id = `ruang-card-${r.id}`;
+        card.className = 'p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs hover:border-slate-700 transition gap-2';
         card.innerHTML = `
             <div>
-                <span class="font-bold text-slate-200 block">${r.nama} (${r.kode})</span>
-                <span class="text-[10px] text-teal-400 font-medium">${r.klaster} | Urutan: ${r.urutan}</span>
+                <span class="font-bold text-slate-200 block">${escapeHtml(r.nama)} (${escapeHtml(r.kode || '')})</span>
+                <span class="text-[10px] text-teal-400 font-medium">${escapeHtml(r.klaster)} | Urutan: ${r.urutan}</span>
             </div>
-            <button onclick="deleteRuangan(${r.id})" class="px-2.5 py-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 text-[11px] font-semibold border border-rose-800 transition">
-                Hapus
-            </button>
+            <div id="ruang-action-${r.id}">
+                <button type="button" onclick="promptDeleteRuangan(${r.id})" class="px-3 py-1 rounded-lg bg-rose-950/80 hover:bg-rose-900 text-rose-300 text-[11px] font-bold border border-rose-800/80 transition cursor-pointer shadow">
+                    Hapus
+                </button>
+            </div>
         `;
         container.appendChild(card);
     });
+}
+
+function promptDeleteRuangan(id) {
+    const actionContainer = document.getElementById(`ruang-action-${id}`);
+    if (!actionContainer) return;
+
+    actionContainer.innerHTML = `
+        <div class="flex items-center gap-1.5">
+            <span class="text-[10px] text-rose-400 font-bold">Yakin?</span>
+            <button type="button" onclick="executeDeleteRuangan(${id})" class="px-2 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-bold text-[10px] transition shadow">
+                Ya, Hapus
+            </button>
+            <button type="button" onclick="renderRuanganManagerList()" class="px-2 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-[10px] transition">
+                Batal
+            </button>
+        </div>
+    `;
+}
+
+async function executeDeleteRuangan(id) {
+    const numericId = parseInt(id, 10);
+    const actionContainer = document.getElementById(`ruang-action-${numericId}`);
+    if (actionContainer) {
+        actionContainer.innerHTML = `<span class="text-[10px] text-amber-400 font-semibold flex items-center gap-1"><i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Menghapus...</span>`;
+        if (window.lucide) lucide.createIcons();
+    }
+
+    try {
+        const res = await fetch('/api/ruangan/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: numericId })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            await loadDashboardData();
+            renderRuanganManagerList();
+        } else {
+            alert(data.message || 'Gagal menghapus layanan');
+            renderRuanganManagerList();
+        }
+    } catch (err) {
+        console.error("Delete ruangan error:", err);
+        alert("Terjadi kesalahan sistem saat menghapus layanan.");
+        renderRuanganManagerList();
+    }
 }
 
 async function saveNewRuangan() {
@@ -340,8 +412,8 @@ async function saveNewRuangan() {
             document.getElementById('add-ruang-nama').value = '';
             document.getElementById('add-ruang-kode').value = '';
             alert(data.message);
-            loadDashboardData();
-            setTimeout(renderRuanganManagerList, 300);
+            await loadDashboardData();
+            renderRuanganManagerList();
         } else {
             alert(data.message || 'Gagal menambah layanan');
         }
@@ -350,26 +422,23 @@ async function saveNewRuangan() {
     }
 }
 
-async function deleteRuangan(id) {
-    if (!confirm('Apakah Anda yakin ingin menghapus layanan ini? Jadwal terkait layanan ini juga akan terhapus.')) return;
-
-    try {
-        const res = await fetch('/api/ruangan/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id })
-        });
-        const data = await res.json();
-        if (data.status === 'success') {
-            loadDashboardData();
-            setTimeout(renderRuanganManagerList, 300);
-        } else {
-            alert(data.message || 'Gagal menghapus');
-        }
-    } catch (err) {
-        console.error("Delete ruangan error:", err);
-    }
+// Backward compatibility wrapper
+function deleteRuangan(id) {
+    promptDeleteRuangan(id);
 }
+
+// Explicit window bindings
+window.openRuanganModal = openRuanganModal;
+window.closeRuanganModal = closeRuanganModal;
+window.renderRuanganManagerList = renderRuanganManagerList;
+window.saveNewRuangan = saveNewRuangan;
+window.promptDeleteRuangan = promptDeleteRuangan;
+window.executeDeleteRuangan = executeDeleteRuangan;
+window.deleteRuangan = deleteRuangan;
+
+
+
+
 
 // -------------------------------------------------------------
 // LOGIN / LOGOUT MODAL HANDLERS
@@ -1761,3 +1830,290 @@ async function submitBulkMapping() {
 function exportExcel() {
     window.location.href = `/api/export/excel?year=${state.year}&month=${state.month}`;
 }
+
+// -------------------------------------------------------------
+// MANAGE PEGAWAI & EXCEL IMPORT HANDLERS (UNIFIED 2-TAB MODAL)
+// -------------------------------------------------------------
+function openPegawaiModal(defaultTab = 'individu') {
+    switchPegawaiTab(defaultTab);
+    const modal = document.getElementById('modal-manage-pegawai');
+    if (modal) modal.classList.remove('hidden');
+}
+
+function closePegawaiModal() {
+    const modal = document.getElementById('modal-manage-pegawai');
+    if (modal) modal.classList.add('hidden');
+}
+
+function openImportModal() {
+    openPegawaiModal('bulk');
+}
+
+function closeImportModal() {
+    closePegawaiModal();
+}
+
+function switchPegawaiTab(tabName) {
+    const btnIndividu = document.getElementById('tab-peg-btn-individu');
+    const btnBulk = document.getElementById('tab-peg-btn-bulk');
+    const contentIndividu = document.getElementById('tab-peg-content-individu');
+    const contentBulk = document.getElementById('tab-peg-content-bulk');
+
+    if (tabName === 'bulk') {
+        if (btnBulk) btnBulk.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition cursor-pointer bg-teal-950/80 text-teal-300 border-teal-700/80 shadow';
+        if (btnIndividu) btnIndividu.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition cursor-pointer bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700';
+        if (contentBulk) contentBulk.classList.remove('hidden');
+        if (contentIndividu) contentIndividu.classList.add('hidden');
+    } else {
+        if (btnIndividu) btnIndividu.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition cursor-pointer bg-teal-950/80 text-teal-300 border-teal-700/80 shadow';
+        if (btnBulk) btnBulk.className = 'flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition cursor-pointer bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700';
+        if (contentIndividu) contentIndividu.classList.remove('hidden');
+        if (contentBulk) contentBulk.classList.add('hidden');
+
+        resetPegawaiForm();
+        renderPegawaiTable();
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function resetPegawaiForm() {
+    const idInput = document.getElementById('pegawai-form-id');
+    const namaInput = document.getElementById('pegawai-form-nama');
+    const profesiInput = document.getElementById('pegawai-form-profesi');
+    const nipInput = document.getElementById('pegawai-form-nip');
+    const nohpInput = document.getElementById('pegawai-form-nohp');
+
+    if (idInput) idInput.value = '';
+    if (namaInput) namaInput.value = '';
+    if (profesiInput) profesiInput.value = '';
+    if (nipInput) nipInput.value = '';
+    if (nohpInput) nohpInput.value = '';
+
+    const title = document.getElementById('pegawai-form-title');
+    if (title) {
+        title.innerHTML = `<span class="flex items-center gap-1.5"><i data-lucide="user-plus" class="w-4 h-4"></i> Tambah Pegawai Baru</span>`;
+    }
+
+    const btnSave = document.getElementById('btn-save-pegawai-form');
+    if (btnSave) {
+        btnSave.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Simpan Pegawai`;
+        btnSave.className = 'px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition shadow flex items-center gap-1.5';
+    }
+
+    const btnCancel = document.getElementById('btn-cancel-pegawai-form');
+    if (btnCancel) {
+        btnCancel.innerText = 'Reset Form';
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+
+function editPegawaiForm(id) {
+    const p = (state.pegawai_list || []).find(x => x.id === id);
+    if (!p) return;
+
+    document.getElementById('pegawai-form-id').value = p.id;
+    document.getElementById('pegawai-form-nama').value = p.nama;
+    document.getElementById('pegawai-form-profesi').value = p.profesi;
+    document.getElementById('pegawai-form-nip').value = p.nip === '-' ? '' : p.nip;
+    document.getElementById('pegawai-form-nohp').value = p.no_hp === '-' ? '' : p.no_hp;
+
+    const title = document.getElementById('pegawai-form-title');
+    if (title) {
+        title.innerHTML = `<span class="flex items-center gap-1.5 text-amber-300"><i data-lucide="edit-3" class="w-4 h-4 text-amber-400"></i> Edit Data Pegawai: <span class="text-slate-100 font-bold">${escapeHtml(p.nama)}</span></span>`;
+    }
+
+    const btnSave = document.getElementById('btn-save-pegawai-form');
+    if (btnSave) {
+        btnSave.innerHTML = `<i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Simpan Perubahan`;
+        btnSave.className = 'px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold transition shadow flex items-center gap-1.5';
+    }
+
+    const btnCancel = document.getElementById('btn-cancel-pegawai-form');
+    if (btnCancel) {
+        btnCancel.innerText = 'Batal Edit';
+    }
+
+    if (window.lucide) lucide.createIcons();
+}
+
+function renderPegawaiTable(filterText = '') {
+    const tbody = document.getElementById('pegawai-table-body');
+    if (!tbody) return;
+
+    let list = state.pegawai_list || [];
+    if (filterText.trim()) {
+        const query = filterText.toLowerCase();
+        list = list.filter(p => p.nama.toLowerCase().includes(query) || p.profesi.toLowerCase().includes(query) || (p.nip && p.nip.includes(query)));
+    }
+
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-500 italic">Tidak ada data pegawai ditemukan</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = list.map(p => `
+        <tr class="hover:bg-slate-900/80 transition" id="pegawai-row-${p.id}">
+            <td class="p-2.5 font-bold text-slate-200">${escapeHtml(p.nama)}</td>
+            <td class="p-2.5 text-teal-400 font-medium">${escapeHtml(p.profesi)}</td>
+            <td class="p-2.5 font-mono text-[11px] text-slate-400">${escapeHtml(p.nip || '-')}</td>
+            <td class="p-2.5 text-right">
+                <span id="pegawai-action-${p.id}" class="inline-flex items-center gap-1.5">
+                    <button type="button" onclick="editPegawaiForm(${p.id})" class="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-amber-300 rounded-lg text-[10px] font-bold border border-slate-700 transition cursor-pointer">
+                        Edit
+                    </button>
+                    <button type="button" onclick="promptDeletePegawai(${p.id})" class="px-2.5 py-1 bg-rose-950/80 hover:bg-rose-900 text-rose-300 rounded-lg text-[10px] font-bold border border-rose-800 transition cursor-pointer">
+                        Hapus
+                    </button>
+                </span>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function filterPegawaiTable() {
+    const val = document.getElementById('pegawai-search-input').value;
+    renderPegawaiTable(val);
+}
+
+async function savePegawai() {
+    const id = document.getElementById('pegawai-form-id').value;
+    const nama = document.getElementById('pegawai-form-nama').value.trim();
+    const profesi = document.getElementById('pegawai-form-profesi').value.trim();
+    const nip = document.getElementById('pegawai-form-nip').value.trim();
+    const no_hp = document.getElementById('pegawai-form-nohp').value.trim();
+
+    if (!nama || !profesi) {
+        alert('Nama lengkap dan profesi wajib diisi!');
+        return;
+    }
+
+    const endpoint = id ? '/api/pegawai/edit' : '/api/pegawai/add';
+    const payload = id ? { id: parseInt(id, 10), nama, profesi, nip, no_hp } : { nama, profesi, nip, no_hp };
+
+    try {
+        const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (data.status === 'success') {
+            resetPegawaiForm();
+            await loadDashboardData();
+            renderPegawaiTable();
+        } else {
+            alert(data.message || 'Gagal menyimpan pegawai');
+        }
+    } catch (err) {
+        console.error("Save pegawai error:", err);
+        alert("Terjadi kesalahan sistem saat menyimpan data pegawai.");
+    }
+}
+
+function promptDeletePegawai(id) {
+    const span = document.getElementById(`pegawai-action-${id}`);
+    if (!span) return;
+    span.innerHTML = `
+        <span class="text-rose-400 text-[10px] font-bold mr-1">Yakin?</span>
+        <button type="button" onclick="executeDeletePegawai(${id})" class="px-2.5 py-1 bg-rose-700 hover:bg-rose-600 text-white rounded-lg text-[10px] font-bold border border-rose-500 transition cursor-pointer">
+            Ya, Hapus
+        </button>
+        <button type="button" onclick="renderPegawaiTable()" class="px-2.5 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-[10px] font-bold border border-slate-600 transition cursor-pointer">
+            Batal
+        </button>
+    `;
+}
+
+async function executeDeletePegawai(id) {
+    try {
+        const res = await fetch('/api/pegawai/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: id })
+        });
+
+        const data = await res.json();
+        if (data.status === 'success') {
+            await loadDashboardData();
+            renderPegawaiTable();
+        } else {
+            alert(data.message || 'Gagal menghapus pegawai');
+            renderPegawaiTable();
+        }
+    } catch (err) {
+        console.error("Delete pegawai error:", err);
+        renderPegawaiTable();
+    }
+}
+
+async function submitImportExcel() {
+    const fileInput = document.getElementById('excel-file-input');
+    const chkReset = document.getElementById('chk-reset-jadwal');
+    const btnSubmit = document.getElementById('btn-submit-import');
+    const statusMsg = document.getElementById('import-status-msg');
+
+    if (!fileInput || !fileInput.files.length) {
+        alert('Silakan pilih file Excel (.xlsx) terlebih dahulu!');
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('reset_jadwal', chkReset ? chkReset.checked : true);
+
+    if (btnSubmit) {
+        btnSubmit.disabled = true;
+        btnSubmit.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Mengimpor Data Real...`;
+    }
+
+    try {
+        const res = await fetch('/api/import/excel', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await res.json();
+        if (data.status === 'success') {
+            if (statusMsg) {
+                statusMsg.className = 'text-xs p-2.5 rounded-lg bg-teal-950 text-teal-200 border border-teal-800 block';
+                statusMsg.innerText = data.message;
+            }
+            alert(data.message);
+            closePegawaiModal();
+            loadDashboardData();
+        } else {
+            if (statusMsg) {
+                statusMsg.className = 'text-xs p-2.5 rounded-lg bg-rose-950 text-rose-200 border border-rose-800 block';
+                statusMsg.innerText = data.message || 'Gagal mengimpor data';
+            }
+            alert(data.message || 'Gagal mengimpor file Excel');
+        }
+    } catch (err) {
+        console.error("Import error:", err);
+        alert("Terjadi kesalahan saat mengunggah file.");
+    } finally {
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = `<i data-lucide="upload" class="w-4 h-4"></i> Upload & Impor Data Real`;
+            if (window.lucide) lucide.createIcons();
+        }
+    }
+}
+
+// Global window function bindings
+window.openPegawaiModal = openPegawaiModal;
+window.closePegawaiModal = closePegawaiModal;
+window.openImportModal = openImportModal;
+window.closeImportModal = closeImportModal;
+window.switchPegawaiTab = switchPegawaiTab;
+window.resetPegawaiForm = resetPegawaiForm;
+window.editPegawaiForm = editPegawaiForm;
+window.renderPegawaiTable = renderPegawaiTable;
+window.filterPegawaiTable = filterPegawaiTable;
+window.savePegawai = savePegawai;
+window.promptDeletePegawai = promptDeletePegawai;
+window.executeDeletePegawai = executeDeletePegawai;
+window.submitImportExcel = submitImportExcel;

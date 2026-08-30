@@ -163,11 +163,12 @@
                     Kelola Layanan
                 </button>
 
-                <!-- Bulk Mapping Button -->
-                <button id="btn-bulk-mapping" onclick="openBulkModal()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition">
-                    <i data-lucide="layers" class="w-4 h-4 text-teal-400"></i>
-                    Bulk Mapping
+                <!-- Admin Kelola Pegawai Button -->
+                <button onclick="openPegawaiModal('individu')" id="btn-import-excel" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-800/80 hover:bg-teal-700 text-teal-100 text-xs font-bold border border-teal-600/60 shadow-md transition">
+                    <i data-lucide="users" class="w-4 h-4 text-teal-300"></i>
+                    Kelola Pegawai
                 </button>
+
 
                 <!-- Export Excel Button -->
                 <button onclick="exportExcel()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 transition">
@@ -175,10 +176,12 @@
                     Export Excel
                 </button>
 
+
                 <!-- User Auth Profile Badge -->
                 <div id="user-profile-badge" class="flex items-center gap-2 pl-2 border-l border-slate-800">
                     <!-- Populated via JS -->
                 </div>
+
             </div>
         </div>
     </header>
@@ -540,8 +543,8 @@
                             <option value="Klaster 1 (Manajemen)">Klaster 1 (Manajemen)</option>
                             <option value="Klaster 2 (Ibu & Anak)">Klaster 2 (Ibu & Anak)</option>
                             <option value="Klaster 3 (Dewasa & Lansia)">Klaster 3 (Dewasa & Lansia)</option>
-                            <option value="Klaster 4 (P2P & Penunjang)">Klaster 4 (P2P & Penunjang)</option>
-                            <option value="Lintas Klaster">Lintas Klaster (IGD/Rawat Inap)</option>
+                            <option value="Klaster 4 (P2)">Klaster 4 (P2)</option>
+                            <option value="Klaster 5 (Lintas Klaster)">Klaster 5 (Lintas Klaster)</option>
                             <option value="Luar Induk">Luar Induk (Pustu/Poskesdes/Pusling)</option>
                         </select>
                     </div>
@@ -730,7 +733,139 @@
         </div>
     </div>
 
+    <!-- MODAL 5: Unified Manage Pegawai Modal (Bulk & Individu) -->
+    <div id="modal-manage-pegawai" class="hidden fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-5 shadow-2xl space-y-4 max-h-[88vh] flex flex-col">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 class="text-sm font-bold text-slate-100 flex items-center gap-2">
+                    <i data-lucide="users" class="w-5 h-5 text-teal-400"></i>
+                    Kelola Data Pegawai SDMK
+                </h3>
+                <button onclick="closePegawaiModal()" class="text-slate-400 hover:text-slate-100 font-bold text-lg">&times;</button>
+            </div>
+
+            <!-- TAB NAVIGATION (Individu vs Bulk Import) -->
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+                <button type="button" id="tab-peg-btn-individu" onclick="switchPegawaiTab('individu')" class="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition cursor-pointer bg-teal-950/80 text-teal-300 border-teal-700/80 shadow">
+                    <i data-lucide="user" class="w-4 h-4"></i>
+                    Tab Individu (Manual & CRUD)
+                </button>
+                <button type="button" id="tab-peg-btn-bulk" onclick="switchPegawaiTab('bulk')" class="flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-xl border transition cursor-pointer bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700">
+                    <i data-lucide="file-up" class="w-4 h-4"></i>
+                    Tab Bulk (Import Excel Data Real)
+                </button>
+            </div>
+
+            <!-- TAB 1 CONTENT: INDIVIDU (CRUD MANUAL & SEARCH) -->
+            <div id="tab-peg-content-individu" class="space-y-3 flex-1 flex flex-col overflow-hidden">
+                <!-- Add / Edit Form Panel -->
+                <div class="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-3 shrink-0">
+                    <div class="text-xs font-bold text-teal-400 flex items-center justify-between" id="pegawai-form-title">
+                        <span class="flex items-center gap-1.5">
+                            <i data-lucide="user-plus" class="w-4 h-4"></i>
+                            Tambah Pegawai Baru
+                        </span>
+                    </div>
+                    <input type="hidden" id="pegawai-form-id" value="">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">Nama Lengkap & Gelar *</label>
+                            <input type="text" id="pegawai-form-nama" placeholder="Contoh: dr. Ahmad Fauzi, Sp.KKLP" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">Profesi *</label>
+                            <input type="text" id="pegawai-form-profesi" placeholder="Contoh: Dokter Umum / Bidan / Perawat" class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">NIP (Opsional)</label>
+                            <input type="text" id="pegawai-form-nip" placeholder="1985..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-teal-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-slate-400 block mb-1">No. HP / WhatsApp (Opsional)</label>
+                            <input type="text" id="pegawai-form-nohp" placeholder="0812..." class="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-slate-200 focus:outline-none focus:border-teal-500">
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-end gap-2 pt-1">
+                        <button onclick="resetPegawaiForm()" type="button" id="btn-cancel-pegawai-form" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition">
+                            Reset Form
+                        </button>
+                        <button onclick="savePegawai()" type="button" id="btn-save-pegawai-form" class="px-4 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition shadow flex items-center gap-1.5">
+                            <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                            Simpan Pegawai
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Search & Table Header -->
+                <div class="flex items-center justify-between gap-2 text-xs shrink-0">
+                    <span class="font-semibold text-slate-300">Daftar Pegawai Terdaftar</span>
+                    <input type="text" id="pegawai-search-input" oninput="filterPegawaiTable()" placeholder="Cari nama/profesi/NIP..." class="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 w-56">
+                </div>
+
+                <!-- Table of Pegawai -->
+                <div class="flex-1 overflow-y-auto border border-slate-800 rounded-xl bg-slate-950/50 min-h-[160px]">
+                    <table class="w-full text-xs text-left text-slate-300">
+                        <thead class="bg-slate-900 text-slate-400 sticky top-0 border-b border-slate-800">
+                            <tr>
+                                <th class="p-2.5">Nama Pegawai</th>
+                                <th class="p-2.5">Profesi</th>
+                                <th class="p-2.5">NIP</th>
+                                <th class="p-2.5 text-right">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pegawai-table-body" class="divide-y divide-slate-800/60">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 2 CONTENT: BULK IMPORT EXCEL -->
+            <div id="tab-peg-content-bulk" class="hidden space-y-4 text-xs py-2">
+                <div class="p-3.5 bg-teal-950/40 border border-teal-800/60 rounded-xl flex flex-col gap-2">
+                    <span class="font-bold text-teal-300 flex items-center gap-1.5 text-xs">
+                        <i data-lucide="info" class="w-4 h-4 text-teal-400"></i>
+                        Unduh Template Excel Format Standard:
+                    </span>
+                    <p class="text-slate-300">Isikan nama pegawai, NIP, profesi, dan daftar ruangan real Puskesmas Anda ke dalam berkas Excel ini:</p>
+                    <a href="/api/template/excel" class="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white font-bold rounded-lg transition w-fit shadow">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        Unduh Template Excel (.xlsx)
+                    </a>
+                </div>
+
+                <div class="space-y-1.5">
+                    <label class="font-semibold text-slate-300 block">Pilih File Excel Data Real (.xlsx):</label>
+                    <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-teal-300 hover:file:bg-slate-700 bg-slate-950 border border-slate-800 rounded-xl p-1 cursor-pointer">
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input type="checkbox" id="chk-reset-jadwal" checked class="rounded border-slate-800 text-teal-500 focus:ring-teal-500 bg-slate-950">
+                    <label for="chk-reset-jadwal" class="text-slate-300 cursor-pointer">Reset & bersihkan jadwal sample saat import data pegawai baru</label>
+                </div>
+
+                <div id="import-status-msg" class="hidden text-xs p-2.5 rounded-lg"></div>
+
+                <div class="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+                    <button onclick="submitImportExcel()" id="btn-submit-import" class="px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold shadow-md shadow-teal-900/30 transition flex items-center gap-1.5">
+                        <i data-lucide="upload" class="w-4 h-4"></i>
+                        Upload & Impor Data Real
+                    </button>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-end pt-2 border-t border-slate-800 shrink-0">
+                <button onclick="closePegawaiModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition">
+                    Tutup
+                </button>
+            </div>
+        </div>
+    </div>
+
+
     <!-- Rich Tooltip Popover for Compact Mode -->
+
     <div id="rich-tooltip" class="fixed hidden z-50 bg-slate-900 border border-teal-500/40 rounded-xl p-3 shadow-2xl backdrop-blur-md pointer-events-none transition-opacity duration-150 max-w-xs text-xs">
         <div class="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5 mb-2">
             <span id="tooltip-shift-badge" class="px-2 py-0.5 rounded text-[10px] font-bold">Pagi</span>
@@ -750,10 +885,13 @@
     </div>
 
     <!-- Application Script -->
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260830_v7"></script>
     <script>
         // Initialize Lucide Icons
         lucide.createIcons();
     </script>
+
+
+
 </body>
 </html>
