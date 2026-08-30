@@ -182,8 +182,14 @@ def update_jadwal():
     shift_id = data.get('shift_id')
     catatan = data.get('catatan', '')
 
-    if not (tanggal and ruangan_id and pegawai_id and shift_id):
+    if not (tanggal and pegawai_id and shift_id):
         return jsonify({'status': 'error', 'message': 'Data tidak lengkap'}), 400
+
+    shift_obj = Shift.query.get(shift_id) if shift_id else None
+    if shift_obj and shift_obj.kode in ['L', 'C']:
+        ruangan_id = None
+    elif not ruangan_id:
+        return jsonify({'status': 'error', 'message': 'Ruangan harus dipilih untuk shift dinas'}), 400
 
     dt = datetime.strptime(tanggal, '%Y-%m-%d')
     st_obj = get_or_create_status(dt.year, dt.month)
@@ -203,7 +209,7 @@ def update_jadwal():
         if not target_j:
             return jsonify({'status': 'error', 'message': 'Jadwal tidak ditemukan'}), 404
         
-        if existing_staff_assignment and existing_staff_assignment.id != target_j.id:
+        if existing_staff_assignment and existing_staff_assignment.id != target_j.id and ruangan_id is not None:
             peg_name = existing_staff_assignment.pegawai.nama if existing_staff_assignment.pegawai else 'Pegawai'
             room_name = existing_staff_assignment.ruangan.nama if existing_staff_assignment.ruangan else 'Layanan lain'
             shift_code = existing_staff_assignment.shift.kode if existing_staff_assignment.shift else ''
@@ -216,7 +222,7 @@ def update_jadwal():
         target_j.shift_id = shift_id
         target_j.catatan = catatan
     else:
-        if existing_staff_assignment:
+        if existing_staff_assignment and ruangan_id is not None and existing_staff_assignment.ruangan_id is not None:
             peg_name = existing_staff_assignment.pegawai.nama if existing_staff_assignment.pegawai else 'Pegawai'
             room_name = existing_staff_assignment.ruangan.nama if existing_staff_assignment.ruangan else 'Layanan lain'
             shift_code = existing_staff_assignment.shift.kode if existing_staff_assignment.shift else ''
@@ -225,16 +231,16 @@ def update_jadwal():
                 'message': f'Gagal! {peg_name} sudah bertugas di {room_name} (Shift {shift_code}) pada tanggal {tanggal}. Seorang pegawai tidak dapat ditugaskan 2 kali pada tanggal yang sama.'
             }), 400
 
-        existing_in_room = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id, pegawai_id=pegawai_id).first()
+        existing_in_room = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id, pegawai_id=pegawai_id).first() if ruangan_id else None
         if existing_in_room:
             existing_in_room.shift_id = shift_id
             existing_in_room.catatan = catatan
         else:
             new_j = Jadwal(
                 tanggal=tanggal,
-                ruangan_id=ruangan_id,
                 pegawai_id=pegawai_id,
                 shift_id=shift_id,
+                ruangan_id=ruangan_id,
                 catatan=catatan
             )
             db.session.add(new_j)
@@ -297,8 +303,14 @@ def bulk_jadwal():
     pegawai_id = data.get('pegawai_id')
     shift_id = data.get('shift_id')
 
-    if not (start_date and end_date and ruangan_id and pegawai_id and shift_id):
+    if not (start_date and end_date and pegawai_id and shift_id):
         return jsonify({'status': 'error', 'message': 'Parameter bulk mapping tidak lengkap'}), 400
+
+    shift_obj = Shift.query.get(shift_id) if shift_id else None
+    if shift_obj and shift_obj.kode in ['L', 'C']:
+        ruangan_id = None
+    elif not ruangan_id:
+        return jsonify({'status': 'error', 'message': 'Ruangan harus dipilih untuk shift dinas'}), 400
 
     try:
         d_start = datetime.strptime(start_date, '%Y-%m-%d')
@@ -327,17 +339,18 @@ def bulk_jadwal():
         # Check existing assignment for staff on this date
         existing_assignment = Jadwal.query.filter_by(tanggal=tgl_str, pegawai_id=pegawai_id).first()
         
-        if existing_assignment and existing_assignment.ruangan_id != ruangan_id:
+        if existing_assignment and ruangan_id is not None and existing_assignment.ruangan_id != ruangan_id and existing_assignment.ruangan_id is not None:
             conflicts_skipped.append(tgl_str)
         else:
             if existing_assignment:
                 existing_assignment.shift_id = shift_id
+                existing_assignment.ruangan_id = ruangan_id
             else:
                 new_j = Jadwal(
                     tanggal=tgl_str,
-                    ruangan_id=ruangan_id,
                     pegawai_id=pegawai_id,
-                    shift_id=shift_id
+                    shift_id=shift_id,
+                    ruangan_id=ruangan_id
                 )
                 db.session.add(new_j)
             applied_count += 1

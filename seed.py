@@ -192,7 +192,7 @@ def init_seed_data():
                     jadwal_off = Jadwal(
                         tanggal=date_str,
                         pegawai_id=p.id,
-                        ruangan_id=ruangan_objs[0].id, # placeholder room ID for DB FK
+                        ruangan_id=None,
                         shift_id=shift_objs[off_code].id,
                         catatan='Libur Rutin' if off_code == 'L' else 'Cuti Tahunan'
                     )

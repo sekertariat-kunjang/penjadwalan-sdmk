@@ -330,7 +330,7 @@
                 </div>
 
                 <!-- Right Group: Klaster Filter Chips -->
-                <div class="flex items-center gap-1.5 overflow-x-auto">
+                <div id="klaster-filter-container" class="flex items-center gap-1.5 overflow-x-auto">
                     <span class="text-[10px] uppercase font-bold text-slate-400 tracking-wider hidden xl:inline">Filter Klaster:</span>
                     <div id="klaster-filter-chips" class="flex items-center gap-1">
                         <!-- Dynamic Chips via JS -->
@@ -376,9 +376,24 @@
                 <!-- TAB 3: View Harian / Mobile Card -->
                 <div id="tab-harian" class="tab-content hidden space-y-4">
                     <!-- Date Selector Carousel -->
-                    <div class="flex items-center justify-between bg-slate-950 p-2.5 border border-slate-800 rounded-xl">
-                        <span class="text-xs font-semibold text-slate-300">Pilih Tanggal:</span>
-                        <div id="harian-date-carousel" class="flex items-center gap-1.5 overflow-x-auto py-1 px-2">
+                    <div class="flex flex-col sm:flex-row items-center justify-between bg-slate-950 p-2.5 border border-slate-800 rounded-xl gap-2">
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                            <span class="text-xs font-semibold text-slate-300 flex items-center gap-1 shrink-0">
+                                <i data-lucide="calendar" class="w-4 h-4 text-teal-400"></i>
+                                Tanggal:
+                            </span>
+                            <div class="flex items-center gap-1">
+                                <button onclick="navigateHarianDate(-1)" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs border border-slate-800 flex items-center gap-1 transition" title="Hari Sebelumnya">
+                                    <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+                                    <span class="hidden sm:inline text-[11px]">Prev</span>
+                                </button>
+                                <button onclick="navigateHarianDate(1)" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs border border-slate-800 flex items-center gap-1 transition" title="Hari Berikutnya">
+                                    <span class="hidden sm:inline text-[11px]">Next</span>
+                                    <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="harian-date-carousel" class="flex items-center gap-1.5 overflow-x-auto py-1 px-1 w-full">
                             <!-- Dynamic date pills populated by JS -->
                         </div>
                     </div>
@@ -394,15 +409,25 @@
                     <!-- Select Staff Header -->
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-950 p-3 border border-slate-800 rounded-xl">
                         <div class="flex items-center gap-3">
-                            <i data-lucide="user" class="w-5 h-5 text-teal-400"></i>
+                            <div class="w-10 h-10 rounded-xl bg-teal-950/60 border border-teal-800/60 flex items-center justify-center text-teal-400 font-bold shrink-0">
+                                <i data-lucide="user" class="w-5 h-5"></i>
+                            </div>
                             <div>
                                 <h3 id="pegawai-detail-name" class="text-sm font-bold text-slate-100">Pilih Pegawai...</h3>
                                 <p id="pegawai-detail-nip" class="text-xs text-slate-400">NIP: - | Profesi: -</p>
                             </div>
                         </div>
-                        <select id="select-pegawai-detail" onchange="renderPegawaiDetail(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none">
-                            <!-- Options populated via JS -->
-                        </select>
+                        <div class="flex items-center gap-1.5">
+                            <button onclick="navigatePegawaiDetail(-1)" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition" title="Pegawai Sebelumnya">
+                                <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                            </button>
+                            <select id="select-pegawai-detail" onchange="renderPegawaiDetail(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none min-w-[200px]">
+                                <!-- Options populated via JS -->
+                            </select>
+                            <button onclick="navigatePegawaiDetail(1)" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition" title="Pegawai Berikutnya">
+                                <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Shift Summary Badges -->

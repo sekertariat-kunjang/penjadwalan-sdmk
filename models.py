@@ -143,7 +143,7 @@ class Jadwal(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tanggal = db.Column(db.String(10), nullable=False)
     pegawai_id = db.Column(db.Integer, db.ForeignKey('pegawai.id'), nullable=False)
-    ruangan_id = db.Column(db.Integer, db.ForeignKey('ruangan.id'), nullable=False)
+    ruangan_id = db.Column(db.Integer, db.ForeignKey('ruangan.id'), nullable=True)
     shift_id = db.Column(db.Integer, db.ForeignKey('shift.id'), nullable=False)
     catatan = db.Column(db.Text, nullable=True)
 
@@ -151,7 +151,7 @@ class Jadwal(db.Model):
     ruangan = db.relationship('Ruangan', backref=db.backref('jadwal_list', lazy=True))
     shift = db.relationship('Shift', backref=db.backref('jadwal_list', lazy=True))
 
-    def __init__(self, tanggal, pegawai_id, ruangan_id, shift_id, catatan=''):
+    def __init__(self, tanggal, pegawai_id, shift_id, ruangan_id=None, catatan=''):
         self.tanggal = tanggal
         self.pegawai_id = pegawai_id
         self.ruangan_id = ruangan_id
@@ -159,15 +159,16 @@ class Jadwal(db.Model):
         self.catatan = catatan
 
     def to_dict(self):
+        is_off = self.shift and self.shift.kode in ['L', 'C']
         return {
             'id': self.id,
             'tanggal': self.tanggal,
             'pegawai_id': self.pegawai_id,
             'pegawai_nama': self.pegawai.nama if self.pegawai else '',
             'pegawai_profesi': self.pegawai.profesi if self.pegawai else '',
-            'ruangan_id': self.ruangan_id,
-            'ruangan_nama': self.ruangan.nama if self.ruangan else '',
-            'klaster': self.ruangan.klaster if self.ruangan else '',
+            'ruangan_id': None if is_off else self.ruangan_id,
+            'ruangan_nama': '-' if (is_off or not self.ruangan) else self.ruangan.nama,
+            'klaster': '-' if (is_off or not self.ruangan) else self.ruangan.klaster,
             'shift_id': self.shift_id,
             'shift_kode': self.shift.kode if self.shift else '',
             'shift_nama': self.shift.nama if self.shift else '',

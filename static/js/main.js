@@ -245,21 +245,44 @@ function applyRoleAndLockingRestrictions() {
     const userRole = state.current_user ? state.current_user.role : 'pegawai';
 
     if (userRole === 'pegawai' || isLocked) {
-        if (sidebar) sidebar.classList.add('hidden');
+        if (sidebar) {
+            sidebar.classList.add('collapsed');
+            sidebar.classList.remove('hidden');
+            state.isSidebarOpen = false;
+        }
         if (btnBulk) btnBulk.classList.add('hidden');
         if (btnManageLayanan) btnManageLayanan.classList.add('hidden');
     } else {
-        if (sidebar) sidebar.classList.remove('hidden');
+        if (sidebar) {
+            sidebar.classList.remove('hidden');
+            sidebar.classList.remove('collapsed');
+            state.isSidebarOpen = true;
+        }
         if (btnBulk) btnBulk.classList.remove('hidden');
         if (btnManageLayanan) btnManageLayanan.classList.remove('hidden');
     }
 
+    const icon = document.getElementById('icon-toggle-sidebar');
+    const btnToggle = document.getElementById('btn-toggle-sidebar');
+    if (icon) {
+        icon.setAttribute('data-lucide', state.isSidebarOpen ? 'panel-left' : 'panel-left-open');
+    }
+    if (btnToggle) {
+        if (state.isSidebarOpen) {
+            btnToggle.classList.add('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
+            btnToggle.classList.remove('bg-slate-800');
+        } else {
+            btnToggle.classList.remove('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
+            btnToggle.classList.add('bg-slate-800');
+        }
+    }
     if (userRole === 'pegawai' && state.current_user && state.current_user.pegawai_id) {
         const selectDetail = document.getElementById('select-pegawai-detail');
         if (selectDetail) {
             selectDetail.value = state.current_user.pegawai_id;
         }
     }
+    if (window.lucide) lucide.createIcons();
 }
 
 // -------------------------------------------------------------
@@ -451,18 +474,35 @@ function closeConflictModal() {
 // -------------------------------------------------------------
 // UI WORKSPACE CONTROLS (UPPERBAR, SIDEBAR & TOOLTIPS)
 // -------------------------------------------------------------
-function toggleSidebar() {
-    state.isSidebarOpen = !state.isSidebarOpen;
+function toggleSidebar(forceState) {
     const sidebar = document.getElementById('sidebar-palette-container');
     const icon = document.getElementById('icon-toggle-sidebar');
+    const btnToggle = document.getElementById('btn-toggle-sidebar');
 
-    if (sidebar) {
-        if (state.isSidebarOpen) {
-            sidebar.classList.remove('collapsed');
-            if (icon) icon.setAttribute('data-lucide', 'panel-left');
-        } else {
-            sidebar.classList.add('collapsed');
-            if (icon) icon.setAttribute('data-lucide', 'panel-left-open');
+    if (!sidebar) return;
+
+    const isHiddenOrCollapsed = sidebar.classList.contains('hidden') || sidebar.classList.contains('collapsed');
+
+    if (typeof forceState === 'boolean') {
+        state.isSidebarOpen = forceState;
+    } else {
+        state.isSidebarOpen = isHiddenOrCollapsed;
+    }
+
+    if (state.isSidebarOpen) {
+        sidebar.classList.remove('hidden');
+        sidebar.classList.remove('collapsed');
+        if (icon) icon.setAttribute('data-lucide', 'panel-left');
+        if (btnToggle) {
+            btnToggle.classList.add('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
+            btnToggle.classList.remove('bg-slate-800');
+        }
+    } else {
+        sidebar.classList.add('collapsed');
+        if (icon) icon.setAttribute('data-lucide', 'panel-left-open');
+        if (btnToggle) {
+            btnToggle.classList.remove('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
+            btnToggle.classList.add('bg-slate-800');
         }
     }
     if (window.lucide) lucide.createIcons();
@@ -551,7 +591,12 @@ function showRichTooltip(e, inputData, tglStr, roomName) {
     const noteContainer = document.getElementById('tooltip-note-container');
 
     if (dateEl) dateEl.textContent = `Tgl ${tglStr}`;
-    if (roomEl) roomEl.textContent = roomName || '';
+    
+    if (listJ.length === 1 && ['L', 'C'].includes(listJ[0].shift_kode)) {
+        if (roomEl) roomEl.textContent = 'Status Off (Tidak Dinas)';
+    } else {
+        if (roomEl) roomEl.textContent = roomName || '-';
+    }
 
     if (listJ.length === 1) {
         const j = listJ[0];
@@ -702,13 +747,25 @@ function switchTab(tabId) {
     }
 
     document.querySelectorAll('.tab-content').forEach(content => content.classList.add('hidden'));
-    document.getElementById(tabId).classList.remove('hidden');
+    const targetTab = document.getElementById(tabId);
+    if (targetTab) targetTab.classList.remove('hidden');
+
+    const klasterFilterContainer = document.getElementById('klaster-filter-container');
+    if (klasterFilterContainer) {
+        if (tabId === 'tab-klaster') {
+            klasterFilterContainer.classList.remove('hidden');
+        } else {
+            klasterFilterContainer.classList.add('hidden');
+        }
+    }
 
     renderActiveTab();
 }
 
 function renderActiveTab() {
-    if (!document.getElementById('tab-klaster').classList.contains('hidden')) {
+    const isTabKlaster = !document.getElementById('tab-klaster').classList.contains('hidden');
+
+    if (isTabKlaster) {
         renderMatrixKlaster();
     } else if (!document.getElementById('tab-profesi').classList.contains('hidden')) {
         renderMatrixProfesi();
@@ -716,7 +773,7 @@ function renderActiveTab() {
         renderHarianTab();
     } else if (!document.getElementById('tab-pegawai').classList.contains('hidden')) {
         const selectDetail = document.getElementById('select-pegawai-detail');
-        if (selectDetail.value) {
+        if (selectDetail && selectDetail.value) {
             renderPegawaiDetail(selectDetail.value);
         }
     }
@@ -983,8 +1040,9 @@ function renderMatrixProfesi() {
         const dateObj = new Date(state.year, state.month - 1, day);
         const dayIdx = dateObj.getDay();
         const dayName = INDONESIAN_DAYS[dayIdx === 0 ? 6 : dayIdx - 1];
+        const isSunday = dayIdx === 0;
         headerHTML += `
-            <th class="p-1 w-12 text-center border-r border-slate-800/60 font-semibold">
+            <th class="p-1.5 min-w-[54px] text-center border-r border-slate-800/60 font-semibold ${isSunday ? 'bg-rose-950/40 text-rose-400' : ''}" data-day="${day}">
                 <span class="block text-[10px] text-slate-400">${dayName}</span>
                 <span class="text-xs font-bold">${day}</span>
             </th>
@@ -1009,10 +1067,11 @@ function renderMatrixProfesi() {
             currentProfesi = p.profesi;
             const groupTr = document.createElement('tr');
             groupTr.className = 'bg-slate-950/90 text-teal-400 font-bold border-y border-slate-800';
+            const countInProfesi = state.pegawai_list.filter(pg => pg.profesi === currentProfesi).length;
             groupTr.innerHTML = `
                 <td colspan="${state.num_days + 1}" class="p-2 text-xs uppercase tracking-wider pl-4">
                     <i data-lucide="user-check" class="w-3.5 h-3.5 inline mr-1 text-teal-400"></i>
-                    Profesi: ${currentProfesi}
+                    Profesi: ${currentProfesi} (${countInProfesi} Pegawai)
                 </td>
             `;
             tbody.appendChild(groupTr);
@@ -1027,6 +1086,7 @@ function renderMatrixProfesi() {
                 <span class="text-[10px] text-teal-400 font-normal">${p.profesi}</span>
             </td>
         `;
+        tr.innerHTML = rowHTML;
 
         for (let day = 1; day <= state.num_days; day++) {
             const tglStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -1034,21 +1094,44 @@ function renderMatrixProfesi() {
 
             let cellContent = '-';
             if (listJ.length > 0) {
-                cellContent = listJ.map(j => `
-                    <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 mb-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}" title="${j.ruangan_nama}">
-                        <span>${j.shift_kode}</span>
-                    </div>
-                `).join('');
+                cellContent = listJ.map(j => {
+                    const isOff = ['L', 'C'].includes(j.shift_kode);
+                    const roomShort = isOff ? '' : (j.ruangan_nama && j.ruangan_nama !== '-' ? j.ruangan_nama.split(' ')[0] : '');
+                    const titleText = isOff ? `${j.shift_nama}` : `${j.shift_nama} di ${j.ruangan_nama}`;
+                    return `
+                        <div class="px-1 py-0.5 rounded text-[10px] font-bold text-center border border-white/10 shadow-sm transition hover:scale-105 select-none my-0.5" style="background-color: ${j.warna_bg}; color: ${j.warna_text}" title="${titleText}">
+                            <span>${j.shift_kode}</span>
+                            ${roomShort ? `<span class="block text-[8px] font-normal opacity-90 truncate max-w-[44px] mx-auto">${roomShort}</span>` : ''}
+                        </div>
+                    `;
+                }).join('');
             }
 
-            rowHTML += `
-                <td class="p-1 border-r border-b border-slate-800/40 text-center">
-                    ${cellContent}
-                </td>
-            `;
+            const cellTd = document.createElement('td');
+            cellTd.className = 'p-1 border-r border-b border-slate-800/40 text-center';
+            cellTd.setAttribute('data-day', day);
+            cellTd.innerHTML = cellContent;
+
+            if (listJ.length > 0) {
+                cellTd.addEventListener('mouseenter', (e) => {
+                    tr.classList.add('crosshair-row-active');
+                    const currentDay = day;
+                    document.querySelectorAll(`[data-day="${currentDay}"]`).forEach(el => el.classList.add('crosshair-col-active'));
+                    cellTd.classList.add('crosshair-cell-active');
+                    showRichTooltip(e, listJ, tglStr, `Petugas: ${p.nama}`);
+                });
+                cellTd.addEventListener('mousemove', (e) => moveRichTooltip(e));
+                cellTd.addEventListener('mouseleave', () => {
+                    tr.classList.remove('crosshair-row-active');
+                    document.querySelectorAll('.crosshair-col-active').forEach(el => el.classList.remove('crosshair-col-active'));
+                    cellTd.classList.remove('crosshair-cell-active');
+                    hideRichTooltip();
+                });
+            }
+
+            tr.appendChild(cellTd);
         }
 
-        tr.innerHTML = rowHTML;
         tbody.appendChild(tr);
     });
 
@@ -1058,8 +1141,22 @@ function renderMatrixProfesi() {
 // -------------------------------------------------------------
 // TAB 3: View Harian / Mobile Card View
 // -------------------------------------------------------------
+function navigateHarianDate(offset) {
+    if (!state.selectedHarianDate) {
+        state.selectedHarianDate = `${state.year}-${String(state.month).padStart(2, '0')}-01`;
+    }
+    const currentDay = parseInt(state.selectedHarianDate.split('-')[2]);
+    let newDay = currentDay + offset;
+    if (newDay < 1) newDay = 1;
+    if (newDay > state.num_days) newDay = state.num_days;
+
+    state.selectedHarianDate = `${state.year}-${String(state.month).padStart(2, '0')}-${String(newDay).padStart(2, '0')}`;
+    renderHarianTab();
+}
+
 function renderHarianTab() {
     const carousel = document.getElementById('harian-date-carousel');
+    if (!carousel) return;
     carousel.innerHTML = '';
 
     if (!state.selectedHarianDate) {
@@ -1071,8 +1168,9 @@ function renderHarianTab() {
         const isSelected = tglStr === state.selectedHarianDate;
 
         const pill = document.createElement('button');
-        pill.className = `px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition ${isSelected ? 'bg-teal-600 text-white shadow-md shadow-teal-900/40' : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`;
+        pill.className = `px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition ${isSelected ? 'bg-teal-600 text-white shadow-md shadow-teal-900/40 border border-teal-400' : 'bg-slate-900 text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-800'}`;
         pill.textContent = `Tgl ${day}`;
+        pill.id = `harian-pill-${day}`;
         pill.onclick = () => {
             state.selectedHarianDate = tglStr;
             renderHarianTab();
@@ -1081,65 +1179,92 @@ function renderHarianTab() {
         carousel.appendChild(pill);
     }
 
+    // Auto-scroll selected pill into view
+    const selectedPill = document.getElementById(`harian-pill-${parseInt(state.selectedHarianDate.split('-')[2])}`);
+    if (selectedPill && carousel) {
+        selectedPill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+
     renderHarianCards(state.selectedHarianDate);
 }
 
 function renderHarianCards(dateStr) {
     const container = document.getElementById('harian-cards-container');
+    if (!container) return;
     container.innerHTML = '';
 
     const dayJadwals = state.jadwal_list.filter(j => j.tanggal === dateStr);
     const dayJadwalMap = {};
     dayJadwals.forEach(j => {
-        dayJadwalMap[j.ruangan_id] = j;
+        if (!dayJadwalMap[j.ruangan_id]) dayJadwalMap[j.ruangan_id] = [];
+        dayJadwalMap[j.ruangan_id].push(j);
     });
 
     const isLocked = state.status_jadwal.status === 'FINAL';
     const userRole = state.current_user ? state.current_user.role : 'pegawai';
 
     state.ruangan_list.forEach(r => {
-        const j = dayJadwalMap[r.id];
-        const isDuty = j && !['L', 'C'].includes(j.shift_kode);
+        const card = document.createElement('div');
+        card.className = 'bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex flex-col justify-between shadow-lg hover:border-slate-700 transition';
 
-        let shiftBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-500">Tutup / Tidak Ada Dinas</span>`;
-        let staffName = 'Belum Ada Pegawai Jaga';
-        let staffProfesi = '-';
+        const listJ = dayJadwalMap[r.id] || [];
+        const activeDutyList = listJ.filter(j => !['L', 'C'].includes(j.shift_kode));
 
-        if (isDuty) {
-            shiftBadge = `
-                <span class="px-2.5 py-1 rounded-lg text-xs font-extrabold border border-white/10 shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                    Shift ${j.shift_nama} (${j.shift_kode})
+        let shiftBadgeHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-500">Tutup / Tidak Ada Dinas</span>`;
+        let staffContentHTML = '';
+
+        if (activeDutyList.length > 0) {
+            const primaryJ = activeDutyList[0];
+            shiftBadgeHTML = `
+                <span class="px-2 py-0.5 rounded-lg text-[11px] font-extrabold border border-white/10 shadow-sm" style="background-color: ${primaryJ.warna_bg}; color: ${primaryJ.warna_text}">
+                    Shift ${primaryJ.shift_kode} (${primaryJ.shift_nama})
                 </span>
             `;
-            staffName = j.pegawai_nama;
-            staffProfesi = j.pegawai_profesi;
+
+            staffContentHTML = activeDutyList.map(j => `
+                <div class="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80 my-1">
+                    <div class="flex items-center gap-2.5 min-w-0">
+                        <div class="w-7 h-7 rounded-full bg-teal-950 border border-teal-800 flex items-center justify-center text-teal-400 font-bold text-[11px] shrink-0">
+                            ${getStaffInitials(j.pegawai_nama)}
+                        </div>
+                        <div class="min-w-0">
+                            <span class="text-xs font-bold text-slate-200 block truncate">${j.pegawai_nama}</span>
+                            <span class="text-[10px] text-teal-400 font-medium">${j.pegawai_profesi || 'SDMK'}</span>
+                        </div>
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border border-white/10 shrink-0" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                        ${j.shift_kode}
+                    </span>
+                </div>
+            `).join('');
+        } else {
+            staffContentHTML = `
+                <div class="p-2.5 rounded-lg bg-slate-900/40 border border-slate-800 text-center text-slate-500 text-xs italic my-1">
+                    Belum ada pegawai bertugas di layanan ini.
+                </div>
+            `;
         }
 
         const editBtnHTML = (!isLocked && (userRole === 'admin' || userRole === 'kapus')) ? `
-            <button onclick="openCellModal('${dateStr}', ${r.id})" class="mt-3 w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition text-center">
-                Ubah Jadwal
+            <button onclick="openCellModal('${dateStr}', ${r.id})" class="mt-2 w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition text-center flex items-center justify-center gap-1">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-400"></i>
+                Kelola Petugas Layanan
             </button>
         ` : '';
 
         card.innerHTML = `
-            <div class="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2 mb-2">
-                <div>
-                    <h4 class="text-xs font-bold text-slate-100">${r.nama}</h4>
-                    <span class="text-[10px] text-teal-400 font-medium">${r.klaster}</span>
+            <div>
+                <div class="flex items-start justify-between gap-2 border-b border-slate-800/80 pb-2 mb-2">
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-100">${r.nama}</h4>
+                        <span class="text-[10px] text-teal-400 font-medium">${r.klaster}</span>
+                    </div>
+                    ${shiftBadgeHTML}
                 </div>
-                ${shiftBadge}
-            </div>
-
-            <div class="flex items-center gap-2.5 py-1">
-                <div class="w-8 h-8 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-teal-400 font-bold text-xs shrink-0">
-                    <i data-lucide="user" class="w-4 h-4"></i>
-                </div>
-                <div>
-                    <span class="text-xs font-bold text-slate-200 block">${staffName}</span>
-                    <span class="text-[10px] text-slate-400">${staffProfesi}</span>
+                <div class="space-y-1">
+                    ${staffContentHTML}
                 </div>
             </div>
-
             ${editBtnHTML}
         `;
 
@@ -1154,6 +1279,7 @@ function renderHarianCards(dateStr) {
 // -------------------------------------------------------------
 function populateModalDropdowns() {
     const selectDetail = document.getElementById('select-pegawai-detail');
+    if (!selectDetail) return;
     selectDetail.innerHTML = '<option value="">-- Pilih Pegawai --</option>';
     
     state.pegawai_list.forEach(p => {
@@ -1168,6 +1294,20 @@ function populateModalDropdowns() {
     }
 }
 
+function navigatePegawaiDetail(offset) {
+    const selectDetail = document.getElementById('select-pegawai-detail');
+    if (!selectDetail || state.pegawai_list.length === 0) return;
+
+    const currentIndex = state.pegawai_list.findIndex(p => p.id == selectDetail.value);
+    let newIndex = currentIndex + offset;
+    if (newIndex < 0) newIndex = state.pegawai_list.length - 1;
+    if (newIndex >= state.pegawai_list.length) newIndex = 0;
+
+    const newPegawaiId = state.pegawai_list[newIndex].id;
+    selectDetail.value = newPegawaiId;
+    renderPegawaiDetail(newPegawaiId);
+}
+
 function renderPegawaiDetail(pegawaiId) {
     if (!pegawaiId) return;
 
@@ -1175,15 +1315,17 @@ function renderPegawaiDetail(pegawaiId) {
     if (!peg) return;
 
     document.getElementById('pegawai-detail-name').textContent = peg.nama;
-    document.getElementById('pegawai-detail-nip').textContent = `NIP: ${peg.nip} | Profesi: ${peg.profesi}`;
+    document.getElementById('pegawai-detail-nip').textContent = `NIP: ${peg.nip || '-'} | Profesi: ${peg.profesi}`;
 
     const staffJadwals = state.jadwal_list.filter(j => j.pegawai_id == pegawaiId);
 
     let countPagi = 0, countSiang = 0, countMalam = 0, countLibur = 0;
-    const dateJadwalMap = {};
+    const dateJadwalsMap = {};
 
     staffJadwals.forEach(j => {
-        dateJadwalMap[j.tanggal] = j;
+        if (!dateJadwalsMap[j.tanggal]) dateJadwalsMap[j.tanggal] = [];
+        dateJadwalsMap[j.tanggal].push(j);
+
         if (j.shift_kode === 'P') countPagi++;
         else if (j.shift_kode === 'S') countSiang++;
         else if (j.shift_kode === 'M') countMalam++;
@@ -1196,8 +1338,10 @@ function renderPegawaiDetail(pegawaiId) {
     document.getElementById('stat-libur').textContent = countLibur;
 
     const calGrid = document.getElementById('pegawai-calendar-grid');
+    if (!calGrid) return;
     calGrid.innerHTML = '';
 
+    // Calendar Day Headers
     INDONESIAN_DAYS.forEach(d => {
         const dh = document.createElement('div');
         dh.className = 'font-bold text-[11px] text-slate-400 py-1 border-b border-slate-800';
@@ -1205,25 +1349,43 @@ function renderPegawaiDetail(pegawaiId) {
         calGrid.appendChild(dh);
     });
 
+    // Calendar First Day Offset (Mon = 0, Tue = 1 ... Sun = 6)
+    const firstDate = new Date(state.year, state.month - 1, 1);
+    let firstDayIdx = firstDate.getDay(); // 0 = Sun, 1 = Mon ...
+    let offsetDays = firstDayIdx === 0 ? 6 : firstDayIdx - 1;
+
+    for (let i = 0; i < offsetDays; i++) {
+        const emptyCell = document.createElement('div');
+        emptyCell.className = 'bg-slate-950/30 border border-slate-800/30 rounded-lg p-2 h-16 opacity-30';
+        calGrid.appendChild(emptyCell);
+    }
+
+    // Days 1 to num_days
     for (let day = 1; day <= state.num_days; day++) {
         const tglStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const j = dateJadwalMap[tglStr];
+        const dayJadwals = dateJadwalsMap[tglStr] || [];
 
         const cell = document.createElement('div');
-        cell.className = 'bg-slate-900/60 border border-slate-800 rounded-lg p-2 flex flex-col items-center justify-between h-16';
+        cell.className = 'bg-slate-900/60 border border-slate-800 rounded-lg p-1.5 flex flex-col justify-between h-16 transition hover:border-teal-500/50';
 
-        let badge = `<span class="text-[10px] text-slate-600 font-medium">-</span>`;
-        if (j) {
-            badge = `
-                <div class="px-1.5 py-0.5 rounded text-[10px] font-bold w-full truncate border border-white/10 text-center" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
-                    ${j.shift_kode} - ${j.ruangan_nama.split(' ')[0]}
-                </div>
-            `;
+        let badgeHTML = `<span class="text-[10px] text-slate-600 font-medium text-center block opacity-60">-</span>`;
+        if (dayJadwals.length > 0) {
+            badgeHTML = dayJadwals.map(j => {
+                const isOff = ['L', 'C'].includes(j.shift_kode);
+                const roomShort = isOff ? '' : (j.ruangan_nama && j.ruangan_nama !== '-' ? j.ruangan_nama.split(' ')[0] : '');
+                const labelText = isOff ? `${j.shift_kode} (${j.shift_nama})` : `${j.shift_kode} - ${roomShort}`;
+                const titleText = isOff ? `${j.shift_nama}` : `${j.shift_nama} di ${j.ruangan_nama}`;
+                return `
+                    <div class="px-1 py-0.5 rounded text-[9px] font-bold w-full truncate border border-white/10 text-center my-0.5 shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}" title="${titleText}">
+                        ${labelText}
+                    </div>
+                `;
+            }).join('');
         }
 
         cell.innerHTML = `
             <span class="text-xs font-bold text-slate-300 self-start">${day}</span>
-            ${badge}
+            <div class="w-full flex-1 flex flex-col justify-center min-h-0">${badgeHTML}</div>
         `;
 
         calGrid.appendChild(cell);
