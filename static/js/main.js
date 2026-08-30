@@ -256,16 +256,21 @@ function applyRoleAndLockingRestrictions() {
     const sidebar = document.getElementById('sidebar-palette-container');
     const btnManageLayanan = document.getElementById('btn-manage-layanan');
     const btnImportExcel = document.getElementById('btn-import-excel');
+    const btnToggleSidebar = document.getElementById('btn-toggle-sidebar');
+    const upperbarShiftPalette = document.getElementById('upperbar-shift-palette');
 
     const isLocked = state.status_jadwal.status === 'FINAL';
-    const userRole = state.current_user ? state.current_user.role : 'pegawai';
+    const userRole = state.current_user ? state.current_user.role : null;
+    const isPrivileged = (userRole === 'admin' || userRole === 'kapus') && !isLocked;
 
-    if (userRole === 'pegawai' || isLocked) {
+    if (!isPrivileged) {
         if (sidebar) {
+            sidebar.classList.add('hidden');
             sidebar.classList.add('collapsed');
-            sidebar.classList.remove('hidden');
             state.isSidebarOpen = false;
         }
+        if (btnToggleSidebar) btnToggleSidebar.classList.add('hidden');
+        if (upperbarShiftPalette) upperbarShiftPalette.classList.add('hidden');
         if (btnManageLayanan) btnManageLayanan.classList.add('hidden');
         if (btnImportExcel) btnImportExcel.classList.add('hidden');
     } else {
@@ -274,24 +279,23 @@ function applyRoleAndLockingRestrictions() {
             sidebar.classList.remove('collapsed');
             state.isSidebarOpen = true;
         }
+        if (btnToggleSidebar) btnToggleSidebar.classList.remove('hidden');
+        if (upperbarShiftPalette) upperbarShiftPalette.classList.remove('hidden');
         if (btnManageLayanan) btnManageLayanan.classList.remove('hidden');
         if (btnImportExcel) btnImportExcel.classList.remove('hidden');
     }
 
-
-
     const icon = document.getElementById('icon-toggle-sidebar');
-    const btnToggle = document.getElementById('btn-toggle-sidebar');
     if (icon) {
         icon.setAttribute('data-lucide', state.isSidebarOpen ? 'panel-left' : 'panel-left-open');
     }
-    if (btnToggle) {
+    if (btnToggleSidebar) {
         if (state.isSidebarOpen) {
-            btnToggle.classList.add('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
-            btnToggle.classList.remove('bg-slate-800');
+            btnToggleSidebar.classList.add('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
+            btnToggleSidebar.classList.remove('bg-slate-800');
         } else {
-            btnToggle.classList.remove('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
-            btnToggle.classList.add('bg-slate-800');
+            btnToggleSidebar.classList.remove('bg-teal-600/20', 'border-teal-500/50', 'text-teal-300');
+            btnToggleSidebar.classList.add('bg-slate-800');
         }
     }
     if (userRole === 'pegawai' && state.current_user && state.current_user.pegawai_id) {
@@ -1568,7 +1572,12 @@ function updateModalPegawaiDropdown(currentEditingPegawaiId = null) {
 }
 
 function openCellModal(tanggal, ruanganId) {
-    if (state.status_jadwal.status === 'FINAL') {
+    const isLocked = state.status_jadwal.status === 'FINAL';
+    const userRole = state.current_user ? state.current_user.role : null;
+    if (!userRole || (userRole !== 'admin' && userRole !== 'kapus')) {
+        return; // Visitors & pegawai cannot open edit modal
+    }
+    if (isLocked) {
         alert('Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!');
         return;
     }
