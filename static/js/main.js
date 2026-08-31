@@ -156,6 +156,95 @@ function renderUserProfile() {
     if (window.lucide) lucide.createIcons();
 }
 
+function openLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (!modal) return;
+
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    if (usernameInput) usernameInput.value = '';
+    if (passwordInput) passwordInput.value = '';
+
+    const errBox = document.getElementById('login-error-msg');
+    if (errBox) errBox.classList.add('hidden');
+
+    modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+}
+
+function closeLoginModal() {
+    const modal = document.getElementById('login-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function quickLogin(role) {
+    const username = role === 'kapus' ? 'kapus' : 'admin';
+    const password = role === 'kapus' ? 'kapus123' : 'admin123';
+    
+    const usernameInput = document.getElementById('login-username');
+    const passwordInput = document.getElementById('login-password');
+    if (usernameInput) usernameInput.value = username;
+    if (passwordInput) passwordInput.value = password;
+
+    await submitLogin(username, password);
+}
+
+async function handleLoginSubmit(e) {
+    if (e) e.preventDefault();
+    const u = document.getElementById('login-username').value.trim();
+    const p = document.getElementById('login-password').value.trim();
+    await submitLogin(u, p);
+}
+
+async function submitLogin(username, password) {
+    const errBox = document.getElementById('login-error-msg');
+    const errText = document.getElementById('login-error-text');
+    const btnSubmit = document.getElementById('btn-login-submit');
+
+    if (errBox) errBox.classList.add('hidden');
+    if (btnSubmit) btnSubmit.disabled = true;
+
+    try {
+        const res = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'success') {
+            closeLoginModal();
+            await loadDashboardData();
+        } else {
+            if (errBox && errText) {
+                errText.textContent = data.message || 'Username atau password salah!';
+                errBox.classList.remove('hidden');
+            }
+        }
+    } catch (err) {
+        console.error("Login error:", err);
+        if (errBox && errText) {
+            errText.textContent = 'Terjadi kesalahan koneksi server.';
+            errBox.classList.remove('hidden');
+        }
+    } finally {
+        if (btnSubmit) btnSubmit.disabled = false;
+    }
+}
+
+async function submitLogout() {
+    try {
+        const res = await fetch('/api/logout', { method: 'POST' });
+        const data = await res.json();
+        if (data.status === 'success') {
+            state.current_user = null;
+            await loadDashboardData();
+        }
+    } catch (err) {
+        console.error("Logout error:", err);
+    }
+}
+
 // -------------------------------------------------------------
 // APPROVAL WORKFLOW CONTROL BAR
 // -------------------------------------------------------------

@@ -864,6 +864,81 @@
     </div>
 
 
+    <!-- AUTH LOGIN MODAL (ADMIN & KEPALA PUSKESMAS) -->
+    <div id="login-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                        <i data-lucide="shield-check" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-100">Login Hak Akses Sistem</h3>
+                        <p class="text-[11px] text-slate-400">Masuk sebagai Admin atau Kepala Puskesmas</p>
+                    </div>
+                </div>
+                <button onclick="closeLoginModal()" class="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800 transition">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Quick Account Switcher (Preset Buttons) -->
+            <div class="space-y-2">
+                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Pilih Akun Cepat (Quick Login):</span>
+                <div class="grid grid-cols-2 gap-2 text-xs">
+                    <button type="button" onclick="quickLogin('admin')" class="flex flex-col items-start p-2.5 rounded-xl border border-teal-800/60 bg-teal-950/40 hover:bg-teal-900/50 hover:border-teal-600 transition text-left group">
+                        <span class="font-bold text-teal-300 flex items-center gap-1.5 group-hover:text-teal-200">
+                            <i data-lucide="user-cog" class="w-3.5 h-3.5"></i>
+                            Admin SDMK
+                        </span>
+                        <span class="text-[10px] text-slate-400 mt-0.5">Penyusun & Pengelola Data</span>
+                    </button>
+                    <button type="button" onclick="quickLogin('kapus')" class="flex flex-col items-start p-2.5 rounded-xl border border-amber-800/60 bg-amber-950/40 hover:bg-amber-900/50 hover:border-amber-600 transition text-left group">
+                        <span class="font-bold text-amber-300 flex items-center gap-1.5 group-hover:text-amber-200">
+                            <i data-lucide="award" class="w-3.5 h-3.5"></i>
+                            Kepala Puskesmas
+                        </span>
+                        <span class="text-[10px] text-slate-400 mt-0.5">Persetujuan & Pengesahan</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="relative flex py-1 items-center">
+                <div class="flex-grow border-t border-slate-800"></div>
+                <span class="flex-shrink mx-2 text-[10px] font-semibold text-slate-500 uppercase">Atau Masuk Manual</span>
+                <div class="flex-grow border-t border-slate-800"></div>
+            </div>
+
+            <!-- Error Message Banner -->
+            <div id="login-error-msg" class="hidden p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-200 text-xs flex items-center gap-2">
+                <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 shrink-0"></i>
+                <span id="login-error-text"></span>
+            </div>
+
+            <!-- Login Form -->
+            <form onsubmit="handleLoginSubmit(event)" class="space-y-3 text-xs">
+                <div>
+                    <label for="login-username" class="block font-semibold text-slate-300 mb-1">Username</label>
+                    <input type="text" id="login-username" required placeholder="Masukkan username (admin / kapus)..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:border-teal-500">
+                </div>
+                <div>
+                    <label for="login-password" class="block font-semibold text-slate-300 mb-1">Password</label>
+                    <input type="password" id="login-password" required placeholder="Masukkan password..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-100 focus:outline-none focus:border-teal-500">
+                </div>
+                <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+                    <button type="button" onclick="closeLoginModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold transition">
+                        Batal
+                    </button>
+                    <button type="submit" id="btn-login-submit" class="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold transition shadow-md shadow-teal-900/40 flex items-center gap-1.5">
+                        <i data-lucide="log-in" class="w-4 h-4"></i>
+                        Masuk Sistem
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Rich Tooltip Popover for Compact Mode -->
 
     <div id="rich-tooltip" class="fixed hidden z-50 bg-slate-900 border border-teal-500/40 rounded-xl p-3 shadow-2xl backdrop-blur-md pointer-events-none transition-opacity duration-150 max-w-xs text-xs">
