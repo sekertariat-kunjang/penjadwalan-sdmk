@@ -1152,9 +1152,15 @@ function renderMatrixKlaster() {
             }
         }
 
+        const canEditSummary = !isLocked && (userRole === 'admin' || userRole === 'kapus');
+        const pointerSummary = canEditSummary ? 'cursor-pointer hover:bg-emerald-950/50' : 'cursor-default';
+
         const cellTd = document.createElement('td');
-        cellTd.className = 'p-1 border-r border-b border-slate-800/60 text-center bg-slate-950/90';
+        cellTd.className = `p-1 border-r border-b border-slate-800/60 text-center bg-slate-950/90 transition ${pointerSummary}`;
         cellTd.setAttribute('data-day', day);
+        if (canEditSummary) {
+            cellTd.setAttribute('onclick', `openOffCellModal('${tglStr}')`);
+        }
         cellTd.innerHTML = cellContent;
 
         if (offJadwals.length > 0) {
@@ -1522,13 +1528,25 @@ function renderPegawaiDetail(pegawaiId) {
         calGrid.appendChild(emptyCell);
     }
 
-    // Days 1 to num_days
+    const isLocked = state.status_jadwal.status === 'FINAL';
+    const userRole = state.current_user ? state.current_user.role : null;
+    const canEditPegDetail = !isLocked && (userRole === 'admin' || userRole === 'kapus');
+
     for (let day = 1; day <= state.num_days; day++) {
         const tglStr = `${state.year}-${String(state.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const dayJadwals = dateJadwalsMap[tglStr] || [];
 
+        const pointerClass = canEditPegDetail ? 'cursor-pointer hover:border-teal-400 hover:bg-slate-850' : '';
         const cell = document.createElement('div');
-        cell.className = 'bg-slate-900/60 border border-slate-800 rounded-lg p-1.5 flex flex-col justify-between h-16 transition hover:border-teal-500/50';
+        cell.className = `bg-slate-900/60 border border-slate-800 rounded-lg p-1.5 flex flex-col justify-between h-16 transition ${pointerClass}`;
+
+        if (canEditPegDetail) {
+            if (dayJadwals.length > 0 && dayJadwals[0].ruangan_id) {
+                cell.setAttribute('onclick', `openCellModal('${tglStr}', ${dayJadwals[0].ruangan_id})`);
+            } else {
+                cell.setAttribute('onclick', `openOffCellModal('${tglStr}')`);
+            }
+        }
 
         let badgeHTML = `<span class="text-[10px] text-slate-600 font-medium text-center block opacity-60">-</span>`;
         if (dayJadwals.length > 0) {
@@ -1625,39 +1643,41 @@ function updateModalPegawaiDropdown(currentEditingPegawaiId = null) {
     const selectPegawai = document.getElementById('modal-cell-pegawai');
     if (!selectPegawai || !state.selectedCell) return;
 
-    const { tanggal } = state.selectedCell;
+    const { tanggal, ruangan_id } = state.selectedCell;
 
-    // Get IDs of all staff assigned on this date across ALL rooms
-    const assignedStaffIds = state.jadwal_list
+    // Build map of current assignments on this date: pegawai_id -> assignment object
+    const dayAssignmentsMap = {};
+    state.jadwal_list
         .filter(j => j.tanggal === tanggal)
-        .map(j => j.pegawai_id);
-
-    // Filter available staff: not assigned on this date OR matches currentEditingPegawaiId
-    const availableStaff = state.pegawai_list.filter(p => {
-        if (currentEditingPegawaiId && p.id == currentEditingPegawaiId) return true;
-        return !assignedStaffIds.includes(p.id);
-    });
+        .forEach(j => {
+            dayAssignmentsMap[j.pegawai_id] = j;
+        });
 
     selectPegawai.innerHTML = '';
+    selectPegawai.disabled = false;
 
-    if (availableStaff.length === 0) {
+    state.pegawai_list.forEach(p => {
         const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = '-- Semua pegawai sudah ditugaskan pada tanggal ini --';
-        selectPegawai.appendChild(opt);
-        selectPegawai.disabled = true;
-    } else {
-        selectPegawai.disabled = false;
-        availableStaff.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.textContent = `${p.nama} (${p.profesi})`;
-            if (currentEditingPegawaiId && p.id == currentEditingPegawaiId) {
-                opt.selected = true;
+        opt.value = p.id;
+        
+        const existingJ = dayAssignmentsMap[p.id];
+        let statusTag = '';
+        if (existingJ) {
+            if (['L', 'C'].includes(existingJ.shift_kode)) {
+                statusTag = ` — [Status ${existingJ.shift_nama}]`;
+            } else if (existingJ.ruangan_id == ruangan_id) {
+                statusTag = ` — [Piket di Layanan Ini (${existingJ.shift_kode})]`;
+            } else {
+                statusTag = ` — [Piket di ${existingJ.ruangan_nama || 'Layanan lain'} (${existingJ.shift_kode})]`;
             }
-            selectPegawai.appendChild(opt);
-        });
-    }
+        }
+
+        opt.textContent = `${p.nama} (${p.profesi})${statusTag}`;
+        if (currentEditingPegawaiId && p.id == currentEditingPegawaiId) {
+            opt.selected = true;
+        }
+        selectPegawai.appendChild(opt);
+    });
 }
 
 function openCellModal(tanggal, ruanganId) {
@@ -1701,6 +1721,217 @@ function openCellModal(tanggal, ruanganId) {
 function closeCellModal() {
     document.getElementById('modal-cell').classList.add('hidden');
     state.selectedCell = null;
+}
+
+// -------------------------------------------------------------
+// OFF / CUTI CELL EDIT MODAL LOGIC
+// -------------------------------------------------------------
+function openOffCellModal(tanggal) {
+    const isLocked = state.status_jadwal.status === 'FINAL';
+    const userRole = state.current_user ? state.current_user.role : null;
+    if (!userRole || (userRole !== 'admin' && userRole !== 'kapus')) return;
+    if (isLocked) {
+        alert('Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!');
+        return;
+    }
+
+    state.selectedOffDate = tanggal;
+
+    const infoDiv = document.getElementById('modal-off-cell-info');
+    if (infoDiv) {
+        infoDiv.textContent = `Rekap Pegawai Libur / Cuti - Tanggal: ${tanggal}`;
+    }
+
+    const selectShift = document.getElementById('modal-off-shift');
+    if (selectShift) {
+        selectShift.innerHTML = '';
+        state.shift_list.filter(s => ['L', 'C'].includes(s.kode)).forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.id;
+            opt.textContent = `${s.nama} (${s.kode})`;
+            selectShift.appendChild(opt);
+        });
+    }
+
+    renderOffCellAssignedList();
+    resetOffForm();
+
+    const modal = document.getElementById('modal-off-cell');
+    if (modal) modal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+}
+
+function closeOffCellModal() {
+    const modal = document.getElementById('modal-off-cell');
+    if (modal) modal.classList.add('hidden');
+    state.selectedOffDate = null;
+}
+
+function renderOffCellAssignedList() {
+    const listContainer = document.getElementById('modal-off-cell-assigned-list');
+    if (!listContainer || !state.selectedOffDate) return;
+
+    const tanggal = state.selectedOffDate;
+    const assigned = state.jadwal_list.filter(j => j.tanggal === tanggal && ['L', 'C'].includes(j.shift_kode));
+
+    listContainer.innerHTML = '';
+
+    if (assigned.length === 0) {
+        listContainer.innerHTML = `
+            <div class="p-2 text-center text-xs text-slate-500 italic bg-slate-950/40 rounded-lg border border-slate-800">
+                Belum ada pegawai berstatus Libur atau Cuti pada tanggal ini.
+            </div>
+        `;
+        return;
+    }
+
+    assigned.forEach(j => {
+        const item = document.createElement('div');
+        item.className = 'p-2 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between text-xs gap-2';
+        
+        const noteText = j.catatan ? `<span class="text-slate-400 block text-[10px] italic">Catatan: ${j.catatan}</span>` : '';
+
+        item.innerHTML = `
+            <div class="flex items-center gap-2 min-w-0">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold shrink-0 shadow-sm" style="background-color: ${j.warna_bg}; color: ${j.warna_text}">
+                    ${j.shift_kode}
+                </span>
+                <div class="min-w-0">
+                    <span class="font-bold text-slate-200 block truncate text-[11px]">${j.pegawai_nama}</span>
+                    <span class="text-[10px] text-teal-400 font-medium block">${j.pegawai_profesi || 'SDMK'}</span>
+                    ${noteText}
+                </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+                <button onclick="editOffAssignmentInModal(${j.id}, ${j.pegawai_id}, ${j.shift_id}, '${(j.catatan || '').replace(/'/g, "\\'")}')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-teal-300 text-[10px] font-semibold transition border border-slate-700">
+                    Edit
+                </button>
+                <button onclick="deleteAssignmentById(${j.id})" class="px-2 py-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 text-[10px] font-semibold border border-rose-800 transition">
+                    Hapus
+                </button>
+            </div>
+        `;
+        listContainer.appendChild(item);
+    });
+}
+
+function updateModalOffPegawaiDropdown(currentEditingPegawaiId = null) {
+    const selectPegawai = document.getElementById('modal-off-pegawai');
+    if (!selectPegawai || !state.selectedOffDate) return;
+
+    const tanggal = state.selectedOffDate;
+
+    // Build map of current assignments on this date: pegawai_id -> assignment object
+    const dayAssignmentsMap = {};
+    state.jadwal_list
+        .filter(j => j.tanggal === tanggal)
+        .forEach(j => {
+            dayAssignmentsMap[j.pegawai_id] = j;
+        });
+
+    selectPegawai.innerHTML = '';
+    selectPegawai.disabled = false;
+
+    state.pegawai_list.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+
+        const existingJ = dayAssignmentsMap[p.id];
+        let statusTag = '';
+        if (existingJ) {
+            if (['L', 'C'].includes(existingJ.shift_kode)) {
+                statusTag = ` — [Status ${existingJ.shift_nama}]`;
+            } else {
+                statusTag = ` — [Piket di ${existingJ.ruangan_nama || 'Layanan'} (${existingJ.shift_kode})]`;
+            }
+        }
+
+        opt.textContent = `${p.nama} (${p.profesi})${statusTag}`;
+        if (currentEditingPegawaiId && p.id == currentEditingPegawaiId) {
+            opt.selected = true;
+        }
+        selectPegawai.appendChild(opt);
+    });
+}
+
+function editOffAssignmentInModal(id, pegawai_id, shift_id, catatan) {
+    document.getElementById('modal-off-jadwal-id').value = id;
+    document.getElementById('modal-off-shift').value = shift_id;
+    document.getElementById('modal-off-catatan').value = catatan || '';
+    
+    updateModalOffPegawaiDropdown(pegawai_id);
+
+    document.getElementById('modal-off-form-title').textContent = '✏️ Edit Status Libur / Cuti Pegawai';
+    const btnCancel = document.getElementById('btn-cancel-edit-off');
+    if (btnCancel) btnCancel.classList.remove('hidden');
+    
+    const errDiv = document.getElementById('modal-off-error');
+    if (errDiv) errDiv.classList.add('hidden');
+}
+
+function resetOffForm() {
+    document.getElementById('modal-off-jadwal-id').value = '';
+    document.getElementById('modal-off-catatan').value = '';
+    document.getElementById('modal-off-form-title').textContent = '+ Tambah Status Libur / Cuti Pegawai';
+    const btnCancel = document.getElementById('btn-cancel-edit-off');
+    if (btnCancel) btnCancel.classList.add('hidden');
+    
+    updateModalOffPegawaiDropdown(null);
+
+    const errDiv = document.getElementById('modal-off-error');
+    if (errDiv) errDiv.classList.add('hidden');
+}
+
+async function saveOffSchedule() {
+    if (!state.selectedOffDate) return;
+    
+    const jadwal_id = document.getElementById('modal-off-jadwal-id').value;
+    const pegawai_id = parseInt(document.getElementById('modal-off-pegawai').value);
+    const shift_id = parseInt(document.getElementById('modal-off-shift').value);
+    const catatan = document.getElementById('modal-off-catatan').value.trim();
+    
+    const errDiv = document.getElementById('modal-off-error');
+    const errMsg = document.getElementById('modal-off-error-msg');
+
+    if (!pegawai_id || !shift_id) {
+        if (errMsg) errMsg.textContent = 'Harap pilih pegawai dan shift!';
+        if (errDiv) errDiv.classList.remove('hidden');
+        return;
+    }
+
+    const payload = {
+        tanggal: state.selectedOffDate,
+        ruangan_id: null,
+        pegawai_id: pegawai_id,
+        shift_id: shift_id,
+        catatan: catatan
+    };
+
+    if (jadwal_id) {
+        payload.jadwal_id = parseInt(jadwal_id);
+    }
+
+    try {
+        const res = await fetch('/api/jadwal/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+
+        if (res.ok && data.status === 'success') {
+            await loadDashboardData();
+            renderOffCellAssignedList();
+            resetOffForm();
+        } else {
+            if (errMsg) errMsg.textContent = data.message || 'Gagal menyimpan status Libur/Cuti.';
+            if (errDiv) errDiv.classList.remove('hidden');
+        }
+    } catch (err) {
+        console.error("Save off schedule error:", err);
+        if (errMsg) errMsg.textContent = 'Terjadi kesalahan koneksi server.';
+        if (errDiv) errDiv.classList.remove('hidden');
+    }
 }
 
 function renderCellAssignedList() {
