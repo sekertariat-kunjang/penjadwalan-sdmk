@@ -233,16 +233,17 @@ def generate_sample_schedule(year, month, pegawai_objs, ruangan_objs):
             )
             db.session.add(jadwal)
 
-        # Off staff (Libur/Cuti)
+        # Pegawai yang tidak bertugas pada hari tersebut dibiarkan tanpa jadwal (kosong/unassigned)
+        # agar pengguna/admin dapat dengan mudah menugaskan mereka di hari mana saja.
+        # Hanya buat entri Cuti sangat terbatas (opsional) untuk kebutuhan sampel demo.
         for p in pegawai_objs:
-            if p.id not in assigned_today:
-                off_code = 'C' if random.random() < 0.1 else 'L'
+            if p.id not in assigned_today and random.random() < 0.02: # 2% chance untuk sampel demo cuti
                 jadwal_off = Jadwal(
                     tanggal=date_str,
                     pegawai_id=p.id,
                     ruangan_id=None,
-                    shift_id=shift_objs[off_code].id,
-                    catatan='Libur Rutin' if off_code == 'L' else 'Cuti Tahunan'
+                    shift_id=shift_objs['C'].id,
+                    catatan='Cuti Tahunan (Sampel Demo)'
                 )
                 db.session.add(jadwal_off)
 
@@ -255,6 +256,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] == '--clear':
             clear_all_data()
+            init_seed_data()
         elif sys.argv[1] == '--from-excel' and len(sys.argv) > 2:
             init_seed_data(excel_path=sys.argv[2])
         else:

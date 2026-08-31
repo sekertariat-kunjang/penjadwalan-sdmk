@@ -347,23 +347,23 @@ def update_jadwal():
         if not target_j:
             return jsonify({'status': 'error', 'message': 'Jadwal tidak ditemukan'}), 404
 
-        if existing_staff_assignment and existing_staff_assignment.id != target_j.id and ruangan_id is not None:
+        if existing_staff_assignment and existing_staff_assignment.id != target_j.id and ruangan_id is not None and existing_staff_assignment.ruangan_id is not None:
             return _build_conflict_error(existing_staff_assignment)
 
         target_j.ruangan_id = ruangan_id
         target_j.shift_id = shift_id
         target_j.catatan = catatan
     else:
-        if existing_staff_assignment and ruangan_id is not None and existing_staff_assignment.ruangan_id is not None:
-            return _build_conflict_error(existing_staff_assignment)
+        # Jika pegawai sudah memiliki penugasan pada tanggal tersebut:
+        if existing_staff_assignment:
+            # Konflik hanya terjadi jika pegawai sudah berdinas di RUANGAN LAIN pada tanggal yang sama
+            if ruangan_id is not None and existing_staff_assignment.ruangan_id is not None and existing_staff_assignment.ruangan_id != ruangan_id:
+                return _build_conflict_error(existing_staff_assignment)
 
-        existing_in_room = Jadwal.query.filter_by(
-            tanggal=tanggal, ruangan_id=ruangan_id, pegawai_id=pegawai_id
-        ).first() if ruangan_id else None
-
-        if existing_in_room:
-            existing_in_room.shift_id = shift_id
-            existing_in_room.catatan = catatan
+            # Perbarui penugasan yang ada (termasuk mengganti status Libur/Cuti atau ruangan yang sama)
+            existing_staff_assignment.ruangan_id = ruangan_id
+            existing_staff_assignment.shift_id = shift_id
+            existing_staff_assignment.catatan = catatan
         else:
             new_j = Jadwal(
                 tanggal=tanggal,
