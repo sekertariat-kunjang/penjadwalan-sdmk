@@ -19,9 +19,15 @@ class ROLES:
     PRIVILEGED = {'admin', 'kapus'}  # role yang boleh mengubah data
 
 class STATUS:
-    DRAFT     = 'DRAFT'
-    SUBMITTED = 'SUBMITTED'
-    FINAL     = 'FINAL'
+    DRAFT          = 'DRAFT'
+    DRAFT_PROMKES  = 'DRAFT_PROMKES'
+    DRAFT_JEJARING = 'DRAFT_JEJARING'
+    DRAFT_RANAP    = 'DRAFT_RANAP'
+    DRAFT_RAJAL    = 'DRAFT_RAJAL'
+    SUBMITTED      = 'SUBMITTED'
+    FINAL          = 'FINAL'
+
+SEQUENCE_ORDER = ['DRAFT_PROMKES', 'DRAFT_JEJARING', 'DRAFT_RANAP', 'DRAFT_RAJAL', 'SUBMITTED', 'FINAL']
 
 SHIFT_OFF_CODES = {'L', 'C'}  # Libur & Cuti — tidak memerlukan ruangan
 
@@ -63,11 +69,75 @@ def require_privileged(curr_user):
         return jsonify({'status': 'error', 'message': 'Akses ditolak. Hanya Admin atau Kepala Puskesmas yang diizinkan.'}), 403
     return None
 
+def is_room_allowed_for_user(curr_user, ruangan):
+    """
+    Memeriksa apakah user berhak mengedit jadwal pada ruangan tertentu.
+    Super admin ('admin') dan Kepala Puskesmas ('kapus') berhak mengedit semua ruangan.
+    Admin spesifik (promkes, jejaring, ranap, rajal) dibatasi sesuai domainnya.
+    """
+    if not curr_user:
+        return False
+    if curr_user.username == 'admin' or curr_user.role == ROLES.KAPUS:
+        return True
+    if not ruangan:
+        return True  # untuk shift libur/cuti (ruangan_id is None)
+
+    uname = curr_user.username
+    r_nama = ruangan.nama.upper()
+    r_klaster = ruangan.klaster
+
+    if uname == 'promkes':
+        # UKM, Gizi, Rapat, CS-CKG, Promkes, P2
+        return 'GIZI' in r_nama or 'CS' in r_nama or 'RAPAT' in r_nama or 'PROMKES' in r_nama or r_klaster == 'Klaster 4 (P2)'
+    elif uname == 'jejaring':
+        # Luar Induk (Pustu & Polindes)
+        return r_klaster == 'Luar Induk'
+    elif uname == 'ranap':
+        # Rawat Inap & UGD
+        return 'RAWAT INAP' in r_nama or 'UGD' in r_nama
+    elif uname == 'rajal':
+        # Rawat Jalan & Poli (Poli Umum, Lansia, KIA, MTBS, Poli Gigi, Farmasi, Loket)
+        is_ranap_or_gizi = ('RAWAT INAP' in r_nama or 'UGD' in r_nama or 'GIZI' in r_nama or 'CS' in r_nama or 'RAPAT' in r_nama)
+        return r_klaster != 'Luar Induk' and not is_ranap_or_gizi
+
+    return True
+
+def is_user_turn_for_stage(curr_user, status_obj):
+    """
+    Memeriksa apakah saat ini adalah giliran user untuk mengedit sesuai tahapan sequence.
+    Super admin ('admin') dapat mengedit di semua tahapan DRAFT.
+    """
+    if not curr_user or not status_obj:
+        return False
+    if status_obj.status == STATUS.FINAL:
+        return False  # Terkunci per bulan!
+
+    if curr_user.username == 'admin':
+        return True  # Super admin bypass
+
+    st = status_obj.status or STATUS.DRAFT_PROMKES
+    if st == STATUS.DRAFT:
+        st = STATUS.DRAFT_PROMKES
+
+    active_user_map = {
+        STATUS.DRAFT_PROMKES: 'promkes',
+        STATUS.DRAFT_JEJARING: 'jejaring',
+        STATUS.DRAFT_RANAP: 'ranap',
+        STATUS.DRAFT_RAJAL: 'rajal',
+        STATUS.SUBMITTED: 'kapus'
+    }
+
+    allowed_uname = active_user_map.get(st)
+    if allowed_uname:
+        return curr_user.username == allowed_uname or (allowed_uname == 'kapus' and curr_user.role == ROLES.KAPUS)
+
+    return True
+
 def get_or_create_status(year, month):
     """Ambil atau buat record StatusJadwal untuk tahun/bulan tertentu."""
     st = StatusJadwal.query.filter_by(tahun=year, bulan=month).first()
     if not st:
-        st = StatusJadwal(tahun=year, bulan=month, status=STATUS.DRAFT)
+        st = StatusJadwal(tahun=year, bulan=month, status=STATUS.DRAFT_PROMKES)
         db.session.add(st)
         db.session.commit()
     return st
@@ -318,8 +388,8 @@ def delete_pegawai():
 # -------------------------------------------------------------
 @app.route('/api/jadwal/update', methods=['POST'])
 def update_jadwal():
-    # Auth check DULU sebelum apapun
-    err = require_privileged(get_current_user())
+    curr_u = get_current_user()
+    err = require_privileged(curr_u)
     if err: return err
 
     data = request.json or {}
@@ -347,6 +417,15 @@ def update_jadwal():
     st_obj = get_or_create_status(dt.year, dt.month)
     if st_obj.status == STATUS.FINAL:
         return jsonify({'status': 'error', 'message': 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'}), 403
+
+    if not is_user_turn_for_stage(curr_u, st_obj):
+        st_info = st_obj.to_dict()
+        return jsonify({'status': 'error', 'message': f"Akses Ditolak! Tahapan saat ini adalah '{st_info['stage_name']}'. Belum giliran akun {curr_u.username.upper()} untuk mengedit."}), 403
+
+    if ruangan_id:
+        r_obj = db.session.get(Ruangan, ruangan_id)
+        if r_obj and not is_room_allowed_for_user(curr_u, r_obj):
+            return jsonify({'status': 'error', 'message': f"Akses Ditolak! Akun {curr_u.username.upper()} tidak berhak mengedit jadwal di layanan '{r_obj.nama}'."}), 403
 
     # Cek konflik: pegawai sudah ditugaskan di hari yang sama
     existing_staff_assignment = Jadwal.query.filter_by(tanggal=tanggal, pegawai_id=pegawai_id).first()
@@ -388,7 +467,8 @@ def update_jadwal():
 
 @app.route('/api/jadwal/delete', methods=['POST'])
 def delete_jadwal():
-    err = require_privileged(get_current_user())
+    curr_u = get_current_user()
+    err = require_privileged(curr_u)
     if err: return err
 
     data = request.json or {}
@@ -397,14 +477,22 @@ def delete_jadwal():
     ruangan_id = data.get('ruangan_id')
     pegawai_id = data.get('pegawai_id')
 
+    if ruangan_id:
+        r_obj = db.session.get(Ruangan, ruangan_id)
+        if r_obj and not is_room_allowed_for_user(curr_u, r_obj):
+            return jsonify({'status': 'error', 'message': f"Akses Ditolak! Akun {curr_u.username.upper()} tidak berhak menghapus jadwal di layanan '{r_obj.nama}'."}), 403
+
     FINAL_MSG = 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'
 
     if jadwal_id:
         target = db.session.get(Jadwal, jadwal_id)
         if target:
             dt = datetime.strptime(target.tanggal, '%Y-%m-%d')
-            if get_or_create_status(dt.year, dt.month).status == STATUS.FINAL:
+            st_obj = get_or_create_status(dt.year, dt.month)
+            if st_obj.status == STATUS.FINAL:
                 return jsonify({'status': 'error', 'message': FINAL_MSG}), 403
+            if not is_user_turn_for_stage(curr_u, st_obj):
+                return jsonify({'status': 'error', 'message': f"Belum giliran akun {curr_u.username.upper()} untuk mengedit jadwal."}), 403
             db.session.delete(target)
             db.session.commit()
             return jsonify({'status': 'success', 'message': 'Jadwal berhasil dihapus'})
@@ -413,16 +501,22 @@ def delete_jadwal():
         target = Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id, pegawai_id=pegawai_id).first()
         if target:
             dt = datetime.strptime(tanggal, '%Y-%m-%d')
-            if get_or_create_status(dt.year, dt.month).status == STATUS.FINAL:
+            st_obj = get_or_create_status(dt.year, dt.month)
+            if st_obj.status == STATUS.FINAL:
                 return jsonify({'status': 'error', 'message': FINAL_MSG}), 403
+            if not is_user_turn_for_stage(curr_u, st_obj):
+                return jsonify({'status': 'error', 'message': f"Belum giliran akun {curr_u.username.upper()} untuk mengedit jadwal."}), 403
             db.session.delete(target)
             db.session.commit()
             return jsonify({'status': 'success', 'message': 'Jadwal berhasil dihapus'})
 
     elif tanggal and ruangan_id:
         dt = datetime.strptime(tanggal, '%Y-%m-%d')
-        if get_or_create_status(dt.year, dt.month).status == STATUS.FINAL:
+        st_obj = get_or_create_status(dt.year, dt.month)
+        if st_obj.status == STATUS.FINAL:
             return jsonify({'status': 'error', 'message': FINAL_MSG}), 403
+        if not is_user_turn_for_stage(curr_u, st_obj):
+            return jsonify({'status': 'error', 'message': f"Belum giliran akun {curr_u.username.upper()} untuk mengedit jadwal."}), 403
         Jadwal.query.filter_by(tanggal=tanggal, ruangan_id=ruangan_id).delete()
         db.session.commit()
         return jsonify({'status': 'success', 'message': 'Semua penugasan di layanan ini pada tanggal tersebut berhasil dihapus'})
@@ -431,8 +525,8 @@ def delete_jadwal():
 
 @app.route('/api/jadwal/bulk', methods=['POST'])
 def bulk_jadwal():
-    # Auth check DULU
-    err = require_privileged(get_current_user())
+    curr_u = get_current_user()
+    err = require_privileged(curr_u)
     if err: return err
 
     data = request.json or {}
@@ -451,6 +545,11 @@ def bulk_jadwal():
     elif not ruangan_id:
         return jsonify({'status': 'error', 'message': 'Ruangan harus dipilih untuk shift dinas'}), 400
 
+    if ruangan_id:
+        r_obj = db.session.get(Ruangan, ruangan_id)
+        if r_obj and not is_room_allowed_for_user(curr_u, r_obj):
+            return jsonify({'status': 'error', 'message': f"Akses Ditolak! Akun {curr_u.username.upper()} tidak berhak mengedit layanan '{r_obj.nama}'."}), 403
+
     try:
         d_start = datetime.strptime(start_date, '%Y-%m-%d')
         d_end = datetime.strptime(end_date, '%Y-%m-%d')
@@ -463,6 +562,8 @@ def bulk_jadwal():
     st_obj = get_or_create_status(d_start.year, d_start.month)
     if st_obj.status == STATUS.FINAL:
         return jsonify({'status': 'error', 'message': 'Jadwal bulan ini sudah FINAL & terkunci oleh Kepala Puskesmas!'}), 403
+    if not is_user_turn_for_stage(curr_u, st_obj):
+        return jsonify({'status': 'error', 'message': f"Belum giliran akun {curr_u.username.upper()} untuk mengedit jadwal."}), 403
 
     peg = db.session.get(Pegawai, pegawai_id)
     peg_name = peg.nama if peg else 'Pegawai'
@@ -506,7 +607,7 @@ def bulk_jadwal():
     return jsonify({'status': 'success', 'message': f'Bulk mapping berhasil diterapkan untuk {applied_count} tanggal!'})
 
 # -------------------------------------------------------------
-# APPROVAL WORKFLOW ENDPOINT
+# APPROVAL & SEQUENCE PIPELINE WORKFLOW ENDPOINTS
 # -------------------------------------------------------------
 @app.route('/api/jadwal/status/update', methods=['POST'])
 def update_status_jadwal():
@@ -523,32 +624,72 @@ def update_status_jadwal():
 
     action = data.get('action')
     st_obj = get_or_create_status(year, month)
+    curr_st = st_obj.status or STATUS.DRAFT_PROMKES
+    if curr_st == STATUS.DRAFT:
+        curr_st = STATUS.DRAFT_PROMKES
 
-    if action == 'submit':
-        # Hanya admin yang boleh mengajukan
-        if curr_u.role != ROLES.ADMIN:
+    if action == 'advance':
+        next_stage_map = {
+            STATUS.DRAFT_PROMKES: (STATUS.DRAFT_JEJARING, 'Promkes', 'Admin Jejaring'),
+            STATUS.DRAFT_JEJARING: (STATUS.DRAFT_RANAP, 'Jejaring', 'Admin Ranap'),
+            STATUS.DRAFT_RANAP: (STATUS.DRAFT_RAJAL, 'Ranap', 'Admin Rajal'),
+            STATUS.DRAFT_RAJAL: (STATUS.SUBMITTED, 'Rajal', 'Kepala Puskesmas')
+        }
+        
+        if curr_st not in next_stage_map:
+            return jsonify({'status': 'error', 'message': 'Status jadwal sudah pada tahap pengajuan/final.'}), 400
+
+        next_st, from_label, to_label = next_stage_map[curr_st]
+        
+        if not is_user_turn_for_stage(curr_u, st_obj):
+            return jsonify({'status': 'error', 'message': f"Hanya Admin {from_label} atau Super Admin yang dapat melanjutkan ke tahap berikutnya!"}), 403
+
+        st_obj.status = next_st
+        db.session.commit()
+        return jsonify({
+            'status': 'success',
+            'message': f"Berhasil menyelesaikan tahap Admin {from_label}! Giliran pengisian jadwal berpindah ke {to_label}.",
+            'data': st_obj.to_dict()
+        })
+
+    elif action == 'submit':
+        if curr_u.role not in ROLES.PRIVILEGED:
             return jsonify({'status': 'error', 'message': 'Hanya Admin yang dapat mengajukan jadwal ke Kepala Puskesmas!'}), 403
         st_obj.status = STATUS.SUBMITTED
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Jadwal berhasil diajukan ke Kepala Puskesmas!'})
+        return jsonify({'status': 'success', 'message': 'Jadwal berhasil diajukan ke Kepala Puskesmas!', 'data': st_obj.to_dict()})
 
     elif action == 'approve':
         if curr_u.role != ROLES.KAPUS:
-            return jsonify({'status': 'error', 'message': 'Hanya Kepala Puskesmas yang dapat menyetujui jadwal!'}), 403
+            return jsonify({'status': 'error', 'message': 'Hanya Kepala Puskesmas yang dapat menyetujui & mengesahkan jadwal!'}), 403
         st_obj.status = STATUS.FINAL
         st_obj.approved_by = curr_u.to_dict().get('pegawai_nama', curr_u.username)
         st_obj.approved_at = datetime.now().strftime('%Y-%m-%d %H:%M')
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Jadwal telah DISETUJUI & DIFINALKAN oleh Kepala Puskesmas!'})
+        return jsonify({
+            'status': 'success',
+            'message': f"Jadwal bulan {INDONESIAN_MONTHS[month]} {year} telah DISETUJUI & DIFINALKAN oleh Kepala Puskesmas!",
+            'data': st_obj.to_dict()
+        })
 
     elif action == 'revert':
-        if curr_u.role != ROLES.KAPUS:
-            return jsonify({'status': 'error', 'message': 'Hanya Kepala Puskesmas yang dapat mengembalikan jadwal ke Draft!'}), 403
-        st_obj.status = STATUS.DRAFT
+        if curr_u.role != ROLES.KAPUS and curr_u.username != 'admin':
+            return jsonify({'status': 'error', 'message': 'Hanya Kepala Puskesmas atau Super Admin yang dapat mengembalikan status ke Draft!'}), 403
+        target_stage = data.get('target_stage', STATUS.DRAFT_PROMKES)
+        st_obj.status = target_stage
         st_obj.approved_by = None
         st_obj.approved_at = None
         db.session.commit()
-        return jsonify({'status': 'success', 'message': 'Jadwal dikembalikan ke status DRAFT untuk revisi.'})
+        return jsonify({'status': 'success', 'message': 'Jadwal dikembalikan ke status DRAFT revisi.', 'data': st_obj.to_dict()})
+
+    elif action == 'set_stage':
+        if curr_u.username != 'admin':
+            return jsonify({'status': 'error', 'message': 'Hanya Super Admin yang dapat mengubah tahapan secara manual'}), 403
+        new_stage = data.get('stage')
+        if new_stage in SEQUENCE_ORDER:
+            st_obj.status = new_stage
+            db.session.commit()
+            return jsonify({'status': 'success', 'message': f"Tahapan berhasil diubah ke {new_stage}", 'data': st_obj.to_dict()})
 
     return jsonify({'status': 'error', 'message': 'Aksi tidak valid'}), 400
 

@@ -254,50 +254,170 @@ async function submitLogout() {
 }
 
 // -------------------------------------------------------------
-// APPROVAL WORKFLOW CONTROL BAR
+// GRANULAR ACCESS CONTROL & ROOM PERMISSION HELPER
 // -------------------------------------------------------------
+function canUserEditRoom(ruanganObj) {
+    if (!state.current_user) return false;
+    const stObj = state.status_jadwal || {};
+    if (stObj.status === 'FINAL') return false; // Per-month lock!
+
+    const u = state.current_user;
+    if (u.username === 'admin') return true; // Super admin access to all
+    if (u.role === 'kapus') return true;
+
+    // Verify active turn in sequence
+    const activeUsername = stObj.active_username || 'promkes';
+    if (u.username !== activeUsername && u.username !== 'admin') {
+        return false;
+    }
+
+    if (!ruanganObj) return true; // Off/Libur/Cuti allowed
+
+    const uname = u.username;
+    const rNama = (ruanganObj.nama || '').toUpperCase();
+    const rKlaster = ruanganObj.klaster || '';
+
+    if (uname === 'promkes') {
+        return rNama.includes('GIZI') || rNama.includes('CS') || rNama.includes('RAPAT') || rNama.includes('PROMKES') || rKlaster === 'Klaster 4 (P2)';
+    } else if (uname === 'jejaring') {
+        return rKlaster === 'Luar Induk';
+    } else if (uname === 'ranap') {
+        return rNama.includes('RAWAT INAP') || rNama.includes('UGD');
+    } else if (uname === 'rajal') {
+        const isRanapOrGizi = rNama.includes('RAWAT INAP') || rNama.includes('UGD') || rNama.includes('GIZI') || rNama.includes('CS') || rNama.includes('RAPAT');
+        return rKlaster !== 'Luar Induk' && !isRanapOrGizi;
+    }
+
+    return true;
+}
+
+// -------------------------------------------------------------
+// SEQUENCE PIPELINE & APPROVAL WORKFLOW CONTROL BAR
+// -------------------------------------------------------------
+function renderSequenceStepper() {
+    const container = document.getElementById('sequence-stepper-container');
+    if (!container) return;
+
+    const stages = [
+        { code: 'DRAFT_PROMKES', name: '1. Promkes', user: 'promkes', icon: 'megaphone' },
+        { code: 'DRAFT_JEJARING', name: '2. Jejaring', user: 'jejaring', icon: 'network' },
+        { code: 'DRAFT_RANAP', name: '3. Ranap', user: 'ranap', icon: 'bed' },
+        { code: 'DRAFT_RAJAL', name: '4. Rajal', user: 'rajal', icon: 'stethoscope' },
+        { code: 'SUBMITTED', name: '5. Kapus Review', user: 'kapus', icon: 'clock' },
+        { code: 'FINAL', name: 'Pengesahan', user: 'kapus', icon: 'award' }
+    ];
+
+    const currentStageCode = state.status_jadwal ? (state.status_jadwal.stage_code || 'DRAFT_PROMKES') : 'DRAFT_PROMKES';
+    const isFinal = state.status_jadwal && state.status_jadwal.status === 'FINAL';
+
+    const stageOrder = ['DRAFT_PROMKES', 'DRAFT_JEJARING', 'DRAFT_RANAP', 'DRAFT_RAJAL', 'SUBMITTED', 'FINAL'];
+    const currentIndex = stageOrder.indexOf(currentStageCode === 'DRAFT' ? 'DRAFT_PROMKES' : currentStageCode);
+
+    let html = `
+        <div class="flex items-center gap-1 shrink-0 text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">
+            <i data-lucide="git-commit" class="w-3.5 h-3.5 text-teal-400"></i>
+            <span>Alur Sequence:</span>
+        </div>
+        <div class="flex items-center gap-1.5 overflow-x-auto py-0.5 scrollbar-none w-full">
+    `;
+
+    stages.forEach((st, idx) => {
+        let badgeStyle = 'bg-slate-900 text-slate-500 border-slate-800 opacity-60';
+        let iconHtml = `<i data-lucide="${st.icon}" class="w-3 h-3"></i>`;
+
+        if (isFinal || idx < currentIndex) {
+            badgeStyle = 'bg-emerald-950/80 text-emerald-300 border-emerald-800/80 font-bold';
+            iconHtml = `<i data-lucide="check-circle" class="w-3 h-3 text-emerald-400"></i>`;
+        } else if (idx === currentIndex) {
+            badgeStyle = 'bg-teal-950 text-teal-200 border-teal-500 ring-2 ring-teal-500/30 font-bold animate-pulse';
+            iconHtml = `<i data-lucide="${st.icon}" class="w-3.5 h-3.5 text-teal-400"></i>`;
+        }
+
+        html += `
+            <div class="flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] whitespace-nowrap transition ${badgeStyle}" title="Pengisi: ${st.user.toUpperCase()}">
+                ${iconHtml}
+                <span>${st.name}</span>
+            </div>
+        `;
+
+        if (idx < stages.length - 1) {
+            html += `<i data-lucide="chevron-right" class="w-3 h-3 text-slate-600 shrink-0"></i>`;
+        }
+    });
+
+    html += `</div>`;
+    container.innerHTML = html;
+    if (window.lucide) lucide.createIcons();
+}
+
 function renderApprovalControlBar() {
+    renderSequenceStepper();
+
     const statusBadge = document.getElementById('approval-status-badge');
     const actionButtons = document.getElementById('approval-action-buttons');
     if (!statusBadge || !actionButtons) return;
 
-    const st = state.status_jadwal.status;
-    const approvedBy = state.status_jadwal.approved_by;
+    const stObj = state.status_jadwal || {};
+    const st = stObj.status || 'DRAFT_PROMKES';
+    const stageName = stObj.stage_name || 'Tahap 1: Admin Promkes (UKM)';
+    const activeUsername = stObj.active_username || 'promkes';
+    const approvedBy = stObj.approved_by || '';
 
     if (st === 'FINAL') {
         statusBadge.innerHTML = `
-            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-950 text-emerald-400 border border-emerald-800 flex items-center gap-1.5">
-                <i data-lucide="lock" class="w-3.5 h-3.5"></i>
-                STATUS: FINAL APPROVED (RESMI)
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-800 flex items-center gap-1.5">
+                <i data-lucide="lock" class="w-3.5 h-3.5 text-emerald-400"></i>
+                STATUS: TERKUNCI & DISAHKAN KEPALA PUSKESMAS
             </span>
-            <span class="text-[11px] text-slate-400 hidden sm:inline">Disetujui oleh: <strong class="text-slate-200">${approvedBy}</strong></span>
+            <span class="text-[11px] text-slate-400 hidden sm:inline">Pengesahan oleh: <strong class="text-slate-200">${approvedBy}</strong></span>
         `;
     } else if (st === 'SUBMITTED') {
         statusBadge.innerHTML = `
-            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-950 text-sky-400 border border-sky-800 flex items-center gap-1.5">
-                <i data-lucide="clock" class="w-3.5 h-3.5 animate-spin"></i>
-                STATUS: MENUNGGU REVIEW KEPALA PUSKESMAS
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-950 text-sky-300 border border-sky-800 flex items-center gap-1.5">
+                <i data-lucide="clock" class="w-3.5 h-3.5 text-sky-400 animate-spin"></i>
+                STATUS: MENUNGGU REVIEW & PENGESAHAN KEPALA PUSKESMAS
             </span>
-            <span class="text-[11px] text-slate-400 hidden sm:inline">Jadwal telah diajukan oleh Admin.</span>
+            <span class="text-[11px] text-slate-400 hidden sm:inline">Seluruh admin telah menyelesaikan entry jadwal bulan ini.</span>
         `;
     } else {
         statusBadge.innerHTML = `
-            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-950 text-amber-400 border border-amber-800 flex items-center gap-1.5">
-                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
-                STATUS: DRAFT (Penyusunan Jadwal)
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold bg-teal-950 text-teal-300 border border-teal-700 flex items-center gap-1.5">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5 text-teal-400"></i>
+                ${stageName}
             </span>
-            <span class="text-[11px] text-slate-400 hidden sm:inline">Jadwal belum disahkan.</span>
+            <span class="text-[11px] text-slate-400 hidden sm:inline">Pengisi Aktif: <strong class="text-teal-300 uppercase">${activeUsername}</strong></span>
         `;
     }
 
     actionButtons.innerHTML = '';
     const userRole = state.current_user ? state.current_user.role : null;
+    const username = state.current_user ? state.current_user.username : null;
 
-    if (userRole === 'admin' && st === 'DRAFT') {
-        actionButtons.innerHTML = `
-            <button onclick="updateScheduleStatus('submit')" class="px-3 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-md shadow-sky-900/30">
-                <i data-lucide="send" class="w-3.5 h-3.5"></i>
-                Ajukan Ke Kepala Puskesmas
+    const isMyTurn = (username === activeUsername) || (username === 'admin');
+
+    if (st !== 'FINAL' && st !== 'SUBMITTED' && isMyTurn && username !== 'kapus') {
+        const nextLabels = {
+            'DRAFT_PROMKES': 'Admin Jejaring',
+            'DRAFT': 'Admin Jejaring',
+            'DRAFT_JEJARING': 'Admin Ranap',
+            'DRAFT_RANAP': 'Admin Rajal',
+            'DRAFT_RAJAL': 'Kepala Puskesmas'
+        };
+        const nextTarget = nextLabels[st] || 'Tahap Berikutnya';
+
+        actionButtons.innerHTML += `
+            <button onclick="updateScheduleStatus('advance')" class="px-3 py-1 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-teal-900/30">
+                <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+                Selesaikan & Lanjutkan ke ${nextTarget}
+            </button>
+        `;
+    }
+
+    if (userRole === 'admin' && username === 'admin') {
+        actionButtons.innerHTML += `
+            <button onclick="openSuperAdminStageModal()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold border border-slate-700 transition flex items-center gap-1" title="Lompat Tahapan (Super Admin)">
+                <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+                Set Tahapan
             </button>
         `;
     }
@@ -305,17 +425,17 @@ function renderApprovalControlBar() {
     if (userRole === 'kapus') {
         if (st !== 'FINAL') {
             actionButtons.innerHTML += `
-                <button onclick="updateScheduleStatus('approve')" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1 shadow-md shadow-emerald-900/30">
-                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i>
-                    Setujui & Finalkan Jadwal
+                <button onclick="updateScheduleStatus('approve')" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-900/30">
+                    <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                    Sah-kan & Kunci Jadwal Bulan Ini
                 </button>
             `;
         }
         if (st === 'SUBMITTED' || st === 'FINAL') {
             actionButtons.innerHTML += `
-                <button onclick="updateScheduleStatus('revert')" class="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold transition flex items-center gap-1 border border-slate-700">
-                    <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
-                    Kembalikan ke Draf
+                <button onclick="updateScheduleStatus('revert')" class="px-3 py-1 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 text-xs font-bold transition flex items-center gap-1.5 border border-rose-800 shadow-md">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    Kembalikan ke Status DRAFT (Revisi)
                 </button>
             `;
         }
@@ -324,27 +444,59 @@ function renderApprovalControlBar() {
     if (window.lucide) lucide.createIcons();
 }
 
-async function updateScheduleStatus(action) {
+async function updateScheduleStatus(action, extraData = {}) {
     try {
+        const payload = Object.assign({
+            year: state.year,
+            month: state.month,
+            action: action
+        }, extraData);
+
         const res = await fetch('/api/jadwal/status/update', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                year: state.year,
-                month: state.month,
-                action: action
-            })
+            body: JSON.stringify(payload)
         });
 
         const data = await res.json();
         if (data.status === 'success') {
-            alert(data.message);
-            loadDashboardData();
+            if (typeof showToast === 'function') {
+                showToast(data.message, 'success');
+            } else {
+                alert(data.message);
+            }
+            await loadDashboardData();
         } else {
-            alert(data.message || 'Gagal mengubah status');
+            if (typeof showToast === 'function') {
+                showToast(data.message || 'Gagal mengubah status', 'error');
+            } else {
+                alert(data.message || 'Gagal mengubah status');
+            }
         }
     } catch (err) {
-        console.error("Status update error:", err);
+        console.error("Error updating status:", err);
+        if (typeof showToast === 'function') showToast('Terjadi kesalahan koneksi', 'error');
+    }
+}
+
+function openSuperAdminStageModal() {
+    const stageNames = {
+        'DRAFT_PROMKES': 'Tahap 1: Admin Promkes (UKM)',
+        'DRAFT_JEJARING': 'Tahap 2: Admin Jejaring (Pustu & Polindes)',
+        'DRAFT_RANAP': 'Tahap 3: Admin Ranap (UGD & Rawat Inap)',
+        'DRAFT_RAJAL': 'Tahap 4: Admin Rajal (Rawat Jalan & Poli)',
+        'SUBMITTED': 'Tahap 5: Menunggu Review Kapus',
+        'FINAL': 'Disahkan Kapus (Terkunci)'
+    };
+    
+    let text = 'Pilih Tahapan Sequence untuk bulan ini:\n\n';
+    Object.keys(stageNames).forEach((k, idx) => {
+        text += `${idx + 1}. ${stageNames[k]} (${k})\n`;
+    });
+    
+    const choice = prompt(text + '\nKetik kode tahapan (misal: DRAFT_JEJARING):', state.status_jadwal.stage_code || 'DRAFT_PROMKES');
+    if (choice && stageNames[choice]) {
+        updateScheduleStatus('set_stage', { stage: choice });
     }
 }
 
@@ -1073,8 +1225,8 @@ function renderMatrixKlaster() {
                 }
             }
 
-            const canEdit = !isLocked && (userRole === 'admin' || userRole === 'kapus');
-            const pointerClass = canEdit ? 'cursor-pointer hover:bg-teal-950/40 dropzone' : 'cursor-default';
+            const canEdit = canUserEditRoom(r);
+            const pointerClass = canEdit ? 'cursor-pointer hover:bg-teal-950/40 dropzone' : 'cursor-default opacity-85';
 
             const cellTd = document.createElement('td');
             cellTd.className = `p-1 border-r border-b border-slate-800/40 text-center transition ${pointerClass}`;
@@ -1169,8 +1321,8 @@ function renderMatrixKlaster() {
             }
         }
 
-        const canEditSummary = !isLocked && (userRole === 'admin' || userRole === 'kapus');
-        const pointerSummary = canEditSummary ? 'cursor-pointer hover:bg-emerald-950/50' : 'cursor-default';
+        const canEditSummary = canUserEditRoom(null);
+        const pointerSummary = canEditSummary ? 'cursor-pointer hover:bg-emerald-950/50' : 'cursor-default opacity-85';
 
         const cellTd = document.createElement('td');
         cellTd.className = `p-1 border-r border-b border-slate-800/60 text-center bg-slate-950/90 transition ${pointerSummary}`;

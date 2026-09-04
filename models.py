@@ -61,11 +61,34 @@ class StatusJadwal(db.Model):
         self.approved_at = approved_at
 
     def to_dict(self):
+        st = self.status or 'DRAFT_PROMKES'
+        if st == 'DRAFT':
+            st = 'DRAFT_PROMKES'
+
+        stage_names = {
+            'DRAFT_PROMKES': 'Tahap 1: Admin Promkes (UKM)',
+            'DRAFT_JEJARING': 'Tahap 2: Admin Jejaring (Pustu & Polindes)',
+            'DRAFT_RANAP': 'Tahap 3: Admin Ranap (UGD & Rawat Inap)',
+            'DRAFT_RAJAL': 'Tahap 4: Admin Rajal (Rawat Jalan & Poli)',
+            'SUBMITTED': 'Tahap 5: Menunggu Pengesahan Kapus',
+            'FINAL': 'Disahkan oleh Kepala Puskesmas (Terkunci)'
+        }
+        active_users = {
+            'DRAFT_PROMKES': 'promkes',
+            'DRAFT_JEJARING': 'jejaring',
+            'DRAFT_RANAP': 'ranap',
+            'DRAFT_RAJAL': 'rajal',
+            'SUBMITTED': 'kapus',
+            'FINAL': 'kapus'
+        }
         return {
             'id': self.id,
             'tahun': self.tahun,
             'bulan': self.bulan,
             'status': self.status,
+            'stage_code': st,
+            'stage_name': stage_names.get(st, st),
+            'active_username': active_users.get(st, 'admin'),
             'approved_by': self.approved_by or '',
             'approved_at': self.approved_at or ''
         }
