@@ -177,10 +177,18 @@ function closeLoginModal() {
     if (modal) modal.classList.add('hidden');
 }
 
-async function quickLogin(role) {
-    const username = role === 'kapus' ? 'kapus' : 'admin';
-    const password = role === 'kapus' ? 'kapus123' : 'admin123';
-    
+async function quickLogin(roleOrUsername) {
+    const passwords = {
+        'admin': 'admin456',
+        'kapus': 'kapus123',
+        'promkes': 'promkes123',
+        'jejaring': 'jejaring123',
+        'ranap': 'ranap123',
+        'rajal': 'rajal123'
+    };
+    const username = roleOrUsername;
+    const password = passwords[username] || 'user123';
+
     const usernameInput = document.getElementById('login-username');
     const passwordInput = document.getElementById('login-password');
     if (usernameInput) usernameInput.value = username;
@@ -351,6 +359,15 @@ function applyRoleAndLockingRestrictions() {
     const isLocked = state.status_jadwal.status === 'FINAL';
     const userRole = state.current_user ? state.current_user.role : null;
     const isPrivileged = (userRole === 'admin' || userRole === 'kapus') && !isLocked;
+
+    const btnBackupDb = document.getElementById('btn-backup-db');
+    if (btnBackupDb) {
+        if (userRole === 'admin' || userRole === 'kapus') {
+            btnBackupDb.classList.remove('hidden');
+        } else {
+            btnBackupDb.classList.add('hidden');
+        }
+    }
 
     if (!isPrivileged) {
         if (sidebar) {
@@ -2158,6 +2175,53 @@ async function submitBulkMapping() {
 // Export Excel Handler
 function exportExcel() {
     window.location.href = `/api/export/excel?year=${state.year}&month=${state.month}`;
+}
+
+// Download Backup Database SQLite Handler
+async function downloadBackupDatabase() {
+    try {
+        if (typeof showToast === 'function') {
+            showToast('Memproses unduhan backup database...', 'info');
+        }
+        const response = await fetch('/api/admin/backup-db');
+        if (!response.ok) {
+            let msg = 'Gagal mengunduh backup database.';
+            try {
+                const errData = await response.json();
+                if (errData && errData.message) msg = errData.message;
+            } catch (e) {}
+            if (typeof showToast === 'function') showToast(msg, 'error');
+            else alert(msg);
+            return;
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const now = new Date();
+        const timestamp = now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, '0') +
+            String(now.getDate()).padStart(2, '0') + '_' +
+            String(now.getHours()).padStart(2, '0') +
+            String(now.getMinutes()).padStart(2, '0');
+        a.download = `backup_puskesmas_sdmk_${timestamp}.db`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        if (typeof showToast === 'function') {
+            showToast('Backup database SQLite berhasil diunduh!', 'success');
+        }
+    } catch (err) {
+        console.error("Backup DB error:", err);
+        if (typeof showToast === 'function') {
+            showToast('Terjadi kesalahan jaringan saat mengunduh database.', 'error');
+        } else {
+            alert('Terjadi kesalahan jaringan saat mengunduh database.');
+        }
+    }
 }
 
 // -------------------------------------------------------------

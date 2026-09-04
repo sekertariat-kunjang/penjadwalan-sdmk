@@ -38,6 +38,15 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db.init_app(app)
 
+# Inisialisasi otomatis tabel & akun default saat aplikasi dimuat
+with app.app_context():
+    db.create_all()
+    try:
+        from seed import init_default_users
+        init_default_users()
+    except Exception as e:
+        app.logger.warning(f"Auto init default users warning: {e}")
+
 def get_current_user():
     """Kembalikan objek User yang sedang login, atau None jika belum login."""
     user_id = session.get('user_id')
@@ -615,6 +624,26 @@ def import_excel_data():
     finally:
         if temp_path and os.path.exists(temp_path):
             os.remove(temp_path)
+
+@app.route('/api/admin/backup-db', methods=['GET'])
+def backup_db():
+    """Endpoint khusus Admin/Kapus untuk mengunduh berkas database SQLite (.db)."""
+    curr_user = get_current_user()
+    err = require_privileged(curr_user)
+    if err:
+        return err
+
+    if not os.path.exists(db_path):
+        return jsonify({'status': 'error', 'message': 'File database SQLite tidak ditemukan pada server.'}), 404
+
+    now_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+    download_name = f'backup_puskesmas_sdmk_{now_str}.db'
+    return send_file(
+        db_path,
+        as_attachment=True,
+        download_name=download_name,
+        mimetype='application/x-sqlite3'
+    )
 
 if __name__ == '__main__':
     with app.app_context():

@@ -161,15 +161,23 @@ def init_master_shifts():
     db.session.commit()
 
 def init_default_users():
-    if User.query.filter_by(username='admin').count() == 0:
-        u_admin = User(username='admin', role='admin')
-        u_admin.set_password('admin123')
-        db.session.add(u_admin)
+    default_accounts = [
+        ('admin', 'admin456', 'admin'),
+        ('kapus', 'kapus123', 'kapus'),
+        ('promkes', 'promkes123', 'admin'),
+        ('jejaring', 'jejaring123', 'admin'),
+        ('ranap', 'ranap123', 'admin'),
+        ('rajal', 'rajal123', 'admin'),
+    ]
 
-    if User.query.filter_by(username='kapus').count() == 0:
-        u_kapus = User(username='kapus', role='kapus')
-        u_kapus.set_password('kapus123')
-        db.session.add(u_kapus)
+    for uname, passw, rname in default_accounts:
+        u = User.query.filter_by(username=uname).first()
+        if not u:
+            u = User(username=uname, role=rname)
+            db.session.add(u)
+        else:
+            u.role = rname
+        u.set_password(passw)
 
     db.session.commit()
 

@@ -27,14 +27,21 @@ class User(db.Model):
         return check_password_hash(self.password_hash, password)
 
     def to_dict(self):
+        default_names = {
+            'admin': 'Super Admin SDMK',
+            'kapus': 'Kepala Puskesmas',
+            'promkes': 'Admin Promkes',
+            'jejaring': 'Admin Jejaring',
+            'ranap': 'Admin Ranap',
+            'rajal': 'Admin Rajal'
+        }
+        fallback_name = default_names.get(self.username, 'Admin SDMK' if self.role == 'admin' else 'Pegawai')
         return {
             'id': self.id,
             'username': self.username,
             'role': self.role,
             'pegawai_id': self.pegawai_id,
-            'pegawai_nama': self.pegawai.nama if self.pegawai else (
-                'Kepala Puskesmas' if self.role == 'kapus' else 'Admin SDMK'
-            )
+            'pegawai_nama': self.pegawai.nama if self.pegawai else fallback_name
         }
 
 class StatusJadwal(db.Model):

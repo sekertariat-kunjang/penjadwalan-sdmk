@@ -169,6 +169,11 @@
                     Kelola Pegawai
                 </button>
 
+                <!-- Admin Backup Database Button -->
+                <button id="btn-backup-db" onclick="downloadBackupDatabase()" class="hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 text-xs font-semibold border border-slate-700 shadow-md transition" title="Download Backup Database SQLite">
+                    <i data-lucide="database" class="w-4 h-4 text-teal-400"></i>
+                    Backup DB
+                </button>
 
                 <!-- Export Excel Button -->
                 <button onclick="exportExcel()" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md shadow-emerald-900/30 transition">
@@ -886,20 +891,48 @@
             <!-- Quick Account Switcher (Preset Buttons) -->
             <div class="space-y-2">
                 <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Pilih Akun Cepat (Quick Login):</span>
-                <div class="grid grid-cols-2 gap-2 text-xs">
-                    <button type="button" onclick="quickLogin('admin')" class="flex flex-col items-start p-2.5 rounded-xl border border-teal-800/60 bg-teal-950/40 hover:bg-teal-900/50 hover:border-teal-600 transition text-left group">
-                        <span class="font-bold text-teal-300 flex items-center gap-1.5 group-hover:text-teal-200">
-                            <i data-lucide="user-cog" class="w-3.5 h-3.5"></i>
-                            Admin SDMK
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-xs">
+                    <button type="button" onclick="quickLogin('admin')" class="flex flex-col items-start p-2 rounded-xl border border-teal-800/60 bg-teal-950/40 hover:bg-teal-900/50 hover:border-teal-600 transition text-left group">
+                        <span class="font-bold text-teal-300 flex items-center gap-1 group-hover:text-teal-200 text-[11px]">
+                            <i data-lucide="shield-check" class="w-3.5 h-3.5"></i>
+                            Super Admin
                         </span>
-                        <span class="text-[10px] text-slate-400 mt-0.5">Penyusun & Pengelola Data</span>
+                        <span class="text-[9px] text-slate-400">admin456</span>
                     </button>
-                    <button type="button" onclick="quickLogin('kapus')" class="flex flex-col items-start p-2.5 rounded-xl border border-amber-800/60 bg-amber-950/40 hover:bg-amber-900/50 hover:border-amber-600 transition text-left group">
-                        <span class="font-bold text-amber-300 flex items-center gap-1.5 group-hover:text-amber-200">
+                    <button type="button" onclick="quickLogin('kapus')" class="flex flex-col items-start p-2 rounded-xl border border-amber-800/60 bg-amber-950/40 hover:bg-amber-900/50 hover:border-amber-600 transition text-left group">
+                        <span class="font-bold text-amber-300 flex items-center gap-1 group-hover:text-amber-200 text-[11px]">
                             <i data-lucide="award" class="w-3.5 h-3.5"></i>
-                            Kepala Puskesmas
+                            Kapus
                         </span>
-                        <span class="text-[10px] text-slate-400 mt-0.5">Persetujuan & Pengesahan</span>
+                        <span class="text-[9px] text-slate-400">kapus123</span>
+                    </button>
+                    <button type="button" onclick="quickLogin('promkes')" class="flex flex-col items-start p-2 rounded-xl border border-sky-800/60 bg-sky-950/40 hover:bg-sky-900/50 hover:border-sky-600 transition text-left group">
+                        <span class="font-bold text-sky-300 flex items-center gap-1 group-hover:text-sky-200 text-[11px]">
+                            <i data-lucide="megaphone" class="w-3.5 h-3.5"></i>
+                            Promkes
+                        </span>
+                        <span class="text-[9px] text-slate-400">promkes123</span>
+                    </button>
+                    <button type="button" onclick="quickLogin('jejaring')" class="flex flex-col items-start p-2 rounded-xl border border-indigo-800/60 bg-indigo-950/40 hover:bg-indigo-900/50 hover:border-indigo-600 transition text-left group">
+                        <span class="font-bold text-indigo-300 flex items-center gap-1 group-hover:text-indigo-200 text-[11px]">
+                            <i data-lucide="network" class="w-3.5 h-3.5"></i>
+                            Jejaring
+                        </span>
+                        <span class="text-[9px] text-slate-400">jejaring123</span>
+                    </button>
+                    <button type="button" onclick="quickLogin('ranap')" class="flex flex-col items-start p-2 rounded-xl border border-purple-800/60 bg-purple-950/40 hover:bg-purple-900/50 hover:border-purple-600 transition text-left group">
+                        <span class="font-bold text-purple-300 flex items-center gap-1 group-hover:text-purple-200 text-[11px]">
+                            <i data-lucide="bed" class="w-3.5 h-3.5"></i>
+                            Ranap
+                        </span>
+                        <span class="text-[9px] text-slate-400">ranap123</span>
+                    </button>
+                    <button type="button" onclick="quickLogin('rajal')" class="flex flex-col items-start p-2 rounded-xl border border-emerald-800/60 bg-emerald-950/40 hover:bg-emerald-900/50 hover:border-emerald-600 transition text-left group">
+                        <span class="font-bold text-emerald-300 flex items-center gap-1 group-hover:text-emerald-200 text-[11px]">
+                            <i data-lucide="stethoscope" class="w-3.5 h-3.5"></i>
+                            Rajal
+                        </span>
+                        <span class="text-[9px] text-slate-400">rajal123</span>
                     </button>
                 </div>
             </div>
