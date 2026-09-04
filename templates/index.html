@@ -114,73 +114,71 @@
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col antialiased selection:bg-teal-500 selection:text-white">
 
-    <!-- Top Header Navigation -->
-    <header class="bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-4 py-3">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+    <!-- Top Header Navigation (Strict 1-Row Layout) -->
+    <header class="bg-slate-900/95 backdrop-blur-md border-b border-slate-800 sticky top-0 z-40 px-3 py-2">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-2 flex-nowrap overflow-x-auto scrollbar-none">
             
             <!-- Logo & Title -->
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-lg shadow-teal-900/40">
-                    <i data-lucide="calendar-heart" class="w-6 h-6 text-slate-950 font-bold"></i>
+            <div class="flex items-center gap-2 shrink-0">
+                <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center shadow-md shrink-0">
+                    <i data-lucide="calendar-heart" class="w-5 h-5 text-slate-950 font-bold"></i>
                 </div>
-                <div>
-                    <h1 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-                        Penjadwalan SDMK Puskesmas
-                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">ILP Standard</span>
+                <div class="hidden sm:block">
+                    <h1 class="text-sm font-bold text-slate-100 flex items-center gap-1.5 leading-tight">
+                        Penjadwalan SDMK
+                        <span class="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">ILP Standard</span>
                     </h1>
-                    <p class="text-xs text-slate-400">Dashboard Informasi & Manajemen Piket Layanan Harian</p>
+                    <p class="text-[11px] text-slate-400">Dashboard Informasi & Piket Layanan</p>
                 </div>
             </div>
 
             <!-- Periode Filter, User Auth & Actions (Strict 1-Row Layout) -->
-            <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto py-1 scrollbar-none">
+            <div class="flex items-center gap-1.5 shrink-0 flex-nowrap">
                 <!-- Select Month & Year -->
-                <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-1 shrink-0">
-                    <select id="select-month" class="bg-transparent text-xs font-semibold text-slate-200 px-1.5 py-1 focus:outline-none cursor-pointer">
-                        <option value="1" class="bg-slate-900">Januari</option>
-                        <option value="2" class="bg-slate-900">Februari</option>
-                        <option value="3" class="bg-slate-900">Maret</option>
-                        <option value="4" class="bg-slate-900">April</option>
+                <div class="flex items-center bg-slate-950 border border-slate-800 rounded-lg p-0.5 shrink-0">
+                    <select id="select-month" class="bg-transparent text-xs font-semibold text-slate-200 px-1 py-0.5 focus:outline-none cursor-pointer">
+                        <option value="1" class="bg-slate-900">Jan</option>
+                        <option value="2" class="bg-slate-900">Feb</option>
+                        <option value="3" class="bg-slate-900">Mar</option>
+                        <option value="4" class="bg-slate-900">Apr</option>
                         <option value="5" class="bg-slate-900">Mei</option>
-                        <option value="6" class="bg-slate-900">Juni</option>
-                        <option value="7" class="bg-slate-900">Juli</option>
-                        <option value="8" class="bg-slate-900">Agustus</option>
-                        <option value="9" class="bg-slate-900">September</option>
-                        <option value="10" class="bg-slate-900">Oktober</option>
-                        <option value="11" class="bg-slate-900">November</option>
-                        <option value="12" class="bg-slate-900">Desember</option>
+                        <option value="6" class="bg-slate-900">Jun</option>
+                        <option value="7" class="bg-slate-900">Jul</option>
+                        <option value="8" class="bg-slate-900">Agt</option>
+                        <option value="9" class="bg-slate-900">Sep</option>
+                        <option value="10" class="bg-slate-900">Okt</option>
+                        <option value="11" class="bg-slate-900">Nov</option>
+                        <option value="12" class="bg-slate-900">Des</option>
                     </select>
-                    <select id="select-year" class="bg-transparent text-xs font-semibold text-slate-200 px-1.5 py-1 focus:outline-none cursor-pointer border-l border-slate-800">
+                    <select id="select-year" class="bg-transparent text-xs font-semibold text-slate-200 px-1 py-0.5 focus:outline-none cursor-pointer border-l border-slate-800">
                         <option value="2025" class="bg-slate-900">2025</option>
                         <option value="2026" class="bg-slate-900">2026</option>
                         <option value="2027" class="bg-slate-900">2027</option>
                     </select>
                 </div>
 
-                <!-- Manage Layanan Button -->
-                <button id="btn-manage-layanan" onclick="openRuanganModal()" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition shrink-0" title="Kelola Layanan / Ruangan">
+                <!-- Manage Layanan Button (Icon Only) -->
+                <button id="btn-manage-layanan" onclick="openRuanganModal()" class="flex items-center justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition shrink-0" title="Kelola Layanan / Ruangan">
                     <i data-lucide="plus-circle" class="w-4 h-4 text-teal-400"></i>
-                    <span class="hidden xl:inline">Layanan</span>
                 </button>
 
-                <!-- Admin Kelola Pegawai Button -->
-                <button onclick="openPegawaiModal('individu')" id="btn-import-excel" class="hidden flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-800/80 hover:bg-teal-700 text-teal-100 text-xs font-bold border border-teal-600/60 shadow-md transition shrink-0" title="Kelola Data Pegawai">
+                <!-- Admin Kelola Pegawai Button (Icon Only) -->
+                <button onclick="openPegawaiModal('individu')" id="btn-import-excel" class="hidden flex items-center justify-center p-1.5 rounded-lg bg-teal-800/80 hover:bg-teal-700 text-teal-100 border border-teal-600/60 shadow-md transition shrink-0" title="Kelola Data Pegawai">
                     <i data-lucide="users" class="w-4 h-4 text-teal-300"></i>
-                    <span class="hidden xl:inline">Pegawai</span>
                 </button>
 
                 <!-- Admin Backup Database Button (Icon Only) -->
-                <button id="btn-backup-db" onclick="downloadBackupDatabase()" class="hidden flex items-center justify-center p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 shadow-md transition shrink-0" title="Download Backup Database SQLite (.db)">
+                <button id="btn-backup-db" onclick="downloadBackupDatabase()" class="hidden flex items-center justify-center p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 shadow-md transition shrink-0" title="Download Backup Database SQLite (.db)">
                     <i data-lucide="database" class="w-4 h-4 text-teal-400"></i>
                 </button>
 
                 <!-- Export Excel Button (Icon Only) -->
-                <button onclick="exportExcel()" class="flex items-center justify-center p-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 transition shrink-0" title="Export Jadwal ke Excel (.xlsx)">
+                <button onclick="exportExcel()" class="flex items-center justify-center p-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-900/30 transition shrink-0" title="Export Jadwal ke Excel (.xlsx)">
                     <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
                 </button>
 
                 <!-- User Auth Profile Badge -->
-                <div id="user-profile-badge" class="flex items-center gap-2 pl-2 border-l border-slate-800 shrink-0">
+                <div id="user-profile-badge" class="flex items-center gap-1.5 pl-1.5 border-l border-slate-800 shrink-0">
                     <!-- Populated via JS -->
                 </div>
             </div>
@@ -1064,7 +1062,7 @@
     </div>
 
     <!-- Application Script -->
-    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260831_v8"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}?v=20260904_v10"></script>
     <script>
         // Initialize Lucide Icons
         lucide.createIcons();
