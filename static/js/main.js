@@ -262,8 +262,7 @@ function canUserEditRoom(ruanganObj) {
     if (stObj.status === 'FINAL') return false; // Per-month lock!
 
     const u = state.current_user;
-    if (u.username === 'admin') return true; // Super admin access to all
-    if (u.role === 'kapus') return true;
+    if (u.username === 'admin' || u.role === 'kapus') return true;
 
     // Verify active turn in sequence
     const activeUsername = stObj.active_username || 'promkes';
@@ -271,24 +270,7 @@ function canUserEditRoom(ruanganObj) {
         return false;
     }
 
-    if (!ruanganObj) return true; // Off/Libur/Cuti allowed
-
-    const uname = u.username;
-    const rNama = (ruanganObj.nama || '').toUpperCase();
-    const rKlaster = ruanganObj.klaster || '';
-
-    if (uname === 'promkes') {
-        return rNama.includes('GIZI') || rNama.includes('CS') || rNama.includes('RAPAT') || rNama.includes('PROMKES') || rKlaster === 'Klaster 4 (P2)';
-    } else if (uname === 'jejaring') {
-        return rKlaster === 'Luar Induk';
-    } else if (uname === 'ranap') {
-        return rNama.includes('RAWAT INAP') || rNama.includes('UGD');
-    } else if (uname === 'rajal') {
-        const isRanapOrGizi = rNama.includes('RAWAT INAP') || rNama.includes('UGD') || rNama.includes('GIZI') || rNama.includes('CS') || rNama.includes('RAPAT');
-        return rKlaster !== 'Luar Induk' && !isRanapOrGizi;
-    }
-
-    return true;
+    return true; // (Pending): Bebas mengedit semua ruangan pada giliran sequence aktif
 }
 
 // -------------------------------------------------------------

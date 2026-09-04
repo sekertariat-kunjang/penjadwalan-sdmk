@@ -71,36 +71,11 @@ def require_privileged(curr_user):
 
 def is_room_allowed_for_user(curr_user, ruangan):
     """
-    Memeriksa apakah user berhak mengedit jadwal pada ruangan tertentu.
-    Super admin ('admin') dan Kepala Puskesmas ('kapus') berhak mengedit semua ruangan.
-    Admin spesifik (promkes, jejaring, ranap, rajal) dibatasi sesuai domainnya.
+    (Pending/Flexible Access): Semua admin & kapus berhak mengedit semua ruangan tanpa pembatasan granular.
     """
     if not curr_user:
         return False
-    if curr_user.username == 'admin' or curr_user.role == ROLES.KAPUS:
-        return True
-    if not ruangan:
-        return True  # untuk shift libur/cuti (ruangan_id is None)
-
-    uname = curr_user.username
-    r_nama = ruangan.nama.upper()
-    r_klaster = ruangan.klaster
-
-    if uname == 'promkes':
-        # UKM, Gizi, Rapat, CS-CKG, Promkes, P2
-        return 'GIZI' in r_nama or 'CS' in r_nama or 'RAPAT' in r_nama or 'PROMKES' in r_nama or r_klaster == 'Klaster 4 (P2)'
-    elif uname == 'jejaring':
-        # Luar Induk (Pustu & Polindes)
-        return r_klaster == 'Luar Induk'
-    elif uname == 'ranap':
-        # Rawat Inap & UGD
-        return 'RAWAT INAP' in r_nama or 'UGD' in r_nama
-    elif uname == 'rajal':
-        # Rawat Jalan & Poli (Poli Umum, Lansia, KIA, MTBS, Poli Gigi, Farmasi, Loket)
-        is_ranap_or_gizi = ('RAWAT INAP' in r_nama or 'UGD' in r_nama or 'GIZI' in r_nama or 'CS' in r_nama or 'RAPAT' in r_nama)
-        return r_klaster != 'Luar Induk' and not is_ranap_or_gizi
-
-    return True
+    return curr_user.role in ROLES.PRIVILEGED
 
 def is_user_turn_for_stage(curr_user, status_obj):
     """
